@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
+import { AlertCircle, X } from 'lucide-react';
 import type { Wod, WorkoutFeedback, WorkoutFeedbackInput, RxOrScaled } from '@/types/wod';
 import type { LiveWorkoutResult } from '@/components/live/LiveWorkoutOverlay';
+import { useModalFocus } from '@/components/live/useModalFocus';
 import { saveFeedback } from '@/lib/wods';
-import SegmentedButton from '@/components/ui/SegmentedButton';
+import { Button, IconButton } from '@/components/ui/Button';
+import { TextField, TextAreaField } from '@/components/ui/Field';
+import { cx } from '@/lib/cx';
 import { trackFeedbackSubmitted } from '@/lib/analytics';
 
 interface WorkoutFeedbackFormProps {
@@ -32,18 +36,35 @@ const difficultyLabels: Record<number, string> = {
   10: 'Brutal',
 };
 
-const XIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-  </svg>
+const DIFFICULTY_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+const RX_OPTIONS: { value: RxOrScaled; hint: string }[] = [
+  { value: 'Rx', hint: 'Pesos y movimientos como se escribieron' },
+  { value: 'Scaled', hint: 'Con ajustes de carga o movimientos' },
+];
+
+/** Opción de radio con el input nativo oculto y un área táctil de 48px. */
+const OPTION_INPUT = 'peer sr-only';
+const OPTION_FACE = cx(
+  'flex w-full cursor-pointer items-center justify-center rounded-2xl border border-line bg-surface text-fg transition-colors',
+  'hover:bg-raised',
+  'peer-checked:border-transparent peer-checked:bg-accent-solid peer-checked:text-on-accent peer-checked:hover:bg-accent-solid',
+  'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-flare'
 );
 
 export default function WorkoutFeedbackForm({ wod, wodId, userId, onSaved, onClose, initialTotalTime, session }: WorkoutFeedbackFormProps) {
   const [difficulty, setDifficulty] = useState(5);
   const [totalTime, setTotalTime] = useState(initialTotalTime ? String(Math.round(initialTotalTime)) : '');
   const [rxOrScaled, setRxOrScaled] = useState<RxOrScaled>('Rx');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(() => (session?.metconScore ? `Resultado del metcon: ${session.metconScore}` : ''));
   const [isSaving, setIsSaving] = useState(false);
+  const [timeError, setTimeError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const titleId = useId();
+  const difficultyName = useId();
+  const rxName = useId();
+  const rootRef = useModalFocus<HTMLDivElement>(onClose);
 
   // Body scroll lock
   useEffect(() => {
@@ -58,13 +79,21 @@ export default function WorkoutFeedbackForm({ wod, wodId, userId, onSaved, onClo
     e.preventDefault();
     if (isSaving) return;
 
+    const minutes = totalTime ? parseInt(totalTime, 10) : null;
+    if (minutes !== null && (Number.isNaN(minutes) || minutes < 1 || minutes > 180)) {
+      setTimeError('Escribe un tiempo entre 1 y 180 minutos, o déjalo vacío.');
+      return;
+    }
+    setTimeError(null);
+    setSaveError(null);
+
     setIsSaving(true);
     try {
       const input: WorkoutFeedbackInput = {
         wod_id: wodId ?? null,
         wod_snapshot: wod,
         difficulty_rating: difficulty,
-        total_time_minutes: totalTime ? parseInt(totalTime, 10) : null,
+        total_time_minutes: minutes,
         rx_or_scaled: rxOrScaled,
         notes: notes.trim() || null,
         started_at: session?.startedAt ?? null,
@@ -81,112 +110,134 @@ export default function WorkoutFeedbackForm({ wod, wodId, userId, onSaved, onClo
       onSaved(saved);
     } catch (err) {
       console.error('Error saving feedback:', err);
-      toast.error('No se pudo guardar el resultado.');
+      setSaveError('No se pudo guardar el resultado. Revisa tu conexión e inténtalo de nuevo; tus datos siguen aquí.');
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-neutral-950 flex flex-col overflow-y-auto">
-      {/* Header */}
-      <header className="flex items-center justify-between p-4 pt-6 shrink-0">
-        <h2 className="text-lg font-bold text-white">Registrar Resultado</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="size-10 rounded-full bg-white/5 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white transition-colors"
-          aria-label="Cerrar"
-        >
-          <XIcon />
-        </button>
+    <div
+      ref={rootRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-ground text-fg outline-none"
+    >
+      <header className="sticky top-0 z-10 shrink-0 bg-ground/95 backdrop-blur-sm">
+        <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
+          <div className="min-w-0">
+            <h2 id={titleId} className="font-display text-2xl font-bold tracking-tight">
+              Registrar resultado
+            </h2>
+            <p className="truncate text-sm text-muted">{wod.title}</p>
+          </div>
+          <IconButton label="Cerrar" variant="secondary" onClick={onClose}>
+            <X className="h-5 w-5" aria-hidden="true" />
+          </IconButton>
+        </div>
       </header>
 
-      {/* Content */}
-      <div className="flex-1 px-6 pb-8">
-        <div className="max-w-lg mx-auto w-full">
-          {/* WOD title reference */}
-          <p className="text-sm text-neutral-500 mb-6">{wod.title}</p>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Difficulty slider */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-neutral-300">
-                  Dificultad percibida
-                </label>
-                <span className="text-sm font-semibold text-red-500">
-                  {difficulty}/10 — {difficultyLabels[difficulty]}
-                </span>
-              </div>
-              <input
-                type="range"
-                min={1}
-                max={10}
-                value={difficulty}
-                onChange={(e) => setDifficulty(parseInt(e.target.value, 10))}
-                className="w-full accent-red-500"
-              />
-              <div className="flex justify-between text-xs text-neutral-500 mt-1">
-                <span>Fácil</span>
-                <span>Moderado</span>
-                <span>Brutal</span>
-              </div>
-            </div>
-
-            {/* Time + Rx/Scaled row */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-neutral-300 mb-2">
-                  Tiempo total (min)
-                </label>
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-7 px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+      >
+        {/* Dificultad: grupo de radios 1–10 */}
+        <fieldset>
+          {/* float: la leyenda se comporta como bloque normal y cabe el valor a la derecha */}
+          <legend className="float-left mb-3 flex w-full items-baseline justify-between gap-3 text-sm">
+            <span className="font-medium text-fg">Dificultad percibida</span>
+            <span className="font-semibold text-accent" aria-hidden="true">
+              {difficulty}/10 · {difficultyLabels[difficulty]}
+            </span>
+          </legend>
+          <div className="clear-both grid grid-cols-5 gap-2">
+            {DIFFICULTY_VALUES.map((value) => (
+              <label key={value} className="relative">
                 <input
-                  type="number"
-                  min={1}
-                  max={180}
-                  value={totalTime}
-                  onChange={(e) => setTotalTime(e.target.value)}
-                  placeholder="Opcional"
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  type="radio"
+                  name={difficultyName}
+                  value={value}
+                  checked={difficulty === value}
+                  onChange={() => setDifficulty(value)}
+                  aria-label={`${value} de 10, ${difficultyLabels[value]}`}
+                  className={OPTION_INPUT}
                 />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-neutral-300 mb-2">
-                  Modalidad
-                </label>
-                <SegmentedButton
-                  options={['Rx', 'Scaled']}
-                  selected={rxOrScaled}
-                  onSelect={(v) => setRxOrScaled(v as RxOrScaled)}
-                />
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
-                Notas (opcional)
+                <span className={cx(OPTION_FACE, 'h-12 font-display text-lg font-semibold tabular-nums')} aria-hidden="true">
+                  {value}
+                </span>
               </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ej: Me costaron mucho los pull-ups, tuve que escalar a ring rows..."
-                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
-                rows={3}
-              />
-            </div>
+            ))}
+          </div>
+          <div className="mt-2 flex justify-between text-xs text-muted" aria-hidden="true">
+            <span>Fácil</span>
+            <span>Moderado</span>
+            <span>Brutal</span>
+          </div>
+        </fieldset>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="w-full py-3 text-sm font-bold uppercase tracking-wider text-white bg-red-500 rounded-xl hover:bg-red-600 shadow-lg shadow-red-500/25 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-neutral-950 disabled:opacity-60"
-            >
-              {isSaving ? 'Guardando...' : 'Guardar Resultado'}
-            </button>
-          </form>
+        {/* Modalidad: Rx o Scaled */}
+        <fieldset>
+          <legend className="mb-3 text-sm font-medium text-fg">Modalidad</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {RX_OPTIONS.map((option) => (
+              <label key={option.value} className="relative">
+                <input
+                  type="radio"
+                  name={rxName}
+                  value={option.value}
+                  checked={rxOrScaled === option.value}
+                  onChange={() => setRxOrScaled(option.value)}
+                  className={OPTION_INPUT}
+                />
+                <span className={cx(OPTION_FACE, 'min-h-12 flex-col gap-0.5 px-3 py-2.5')}>
+                  <span className="font-display text-base font-semibold">{option.value}</span>
+                  <span className="text-center text-xs leading-snug opacity-80">{option.hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <TextField
+          label="Tiempo total (min)"
+          hint="Opcional"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={180}
+          value={totalTime}
+          onChange={(e) => {
+            setTotalTime(e.target.value);
+            if (timeError) setTimeError(null);
+          }}
+          placeholder="Ej: 45"
+          error={timeError ?? undefined}
+        />
+
+        <TextAreaField
+          label="Notas"
+          hint="Opcional. Cómo te sentiste, qué escalaste, cargas usadas."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Ej: Me costaron mucho los pull-ups, tuve que escalar a ring rows..."
+          rows={4}
+        />
+
+        <div className="mt-auto flex flex-col gap-3">
+          {saveError && (
+            <div role="alert" className="flex items-start gap-2.5 rounded-2xl border border-accent/40 bg-accent-soft px-4 py-3 text-sm text-fg">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+              <p>{saveError}</p>
+            </div>
+          )}
+          <Button type="submit" size="lg" fullWidth loading={isSaving}>
+            {isSaving ? 'Guardando…' : saveError ? 'Reintentar' : 'Guardar resultado'}
+          </Button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
