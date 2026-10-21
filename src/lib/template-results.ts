@@ -47,7 +47,8 @@ export async function getAllTemplateResults(
     .from('template_results')
     .select('*')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(500);
 
   if (error) throw new Error(`Error al cargar resultados: ${error.message}`);
   return (data ?? []) as TemplateResult[];

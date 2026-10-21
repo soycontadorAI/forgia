@@ -13,12 +13,17 @@ export async function saveWod(userId: string, wod: Wod): Promise<SavedWod> {
   return data as SavedWod;
 }
 
+// Tope de la historia: ~6 meses de un WOD diario. El calendario y la lista
+// cargan todo de una vez, así que esto evita traer años de JSON completo.
+const HISTORY_LIMIT = 200;
+
 export async function getWodHistory(): Promise<SavedWod[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('wods')
-    .select('*')
-    .order('created_at', { ascending: false });
+    .select('id, user_id, wod, created_at')
+    .order('created_at', { ascending: false })
+    .limit(HISTORY_LIMIT);
 
   if (error) throw new Error(`Error al cargar historial: ${error.message}`);
   return (data ?? []) as SavedWod[];
@@ -38,7 +43,7 @@ export async function getLatestWod(): Promise<SavedWod | null> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('wods')
-    .select('*')
+    .select('id, user_id, wod, created_at')
     .order('created_at', { ascending: false })
     .limit(1);
 
@@ -111,7 +116,9 @@ export async function getWodIdsWithFeedback(): Promise<Set<string>> {
   const { data, error } = await supabase
     .from('workout_feedback')
     .select('wod_id')
-    .not('wod_id', 'is', null);
+    .not('wod_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(HISTORY_LIMIT * 2);
 
   if (error) throw new Error(`Error al cargar indicadores de feedback: ${error.message}`);
   return new Set((data ?? []).map((row) => row.wod_id as string));
