@@ -3,44 +3,46 @@
 import { useState, useEffect } from 'react';
 import type { WeeklyAnalysisData } from '@/types/weekly-analysis';
 import { fetchWeeklyAnalysis } from '@/lib/ai-client';
-import Spinner from '@/components/Spinner';
-import { BarChart3, Trophy, AlertTriangle, Lightbulb, TrendingUp } from 'lucide-react';
+import { Card } from '@/components/ui/Card';
+import { AlertTriangle, Flame, Lightbulb, TrendingUp, Trophy, type LucideIcon } from 'lucide-react';
+import { cx } from '@/lib/cx';
 
-const cargaBadge: Record<string, string> = {
-  baja: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  moderada: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  alta: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  excesiva: 'bg-red-200 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+const CARGA_STYLE: Record<WeeklyAnalysisData['carga_percibida'], string> = {
+  baja: 'bg-cooldown/12 text-cooldown',
+  moderada: 'bg-warmup/12 text-warmup',
+  alta: 'bg-metcon/12 text-metcon',
+  excesiva: 'bg-accent-solid text-on-accent',
 };
 
-
-function AnalysisCard({
-  title,
-  icon,
-  items,
-  borderColor,
-  dotColor,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  items: string[];
-  borderColor: string;
-  dotColor: string;
-}) {
+function AnalysisList({ title, icon: Icon, items, tone }: { title: string; icon: LucideIcon; items: string[]; tone: string }) {
+  if (!items.length) return null;
   return (
-    <div className={`rounded-xl border ${borderColor} bg-white dark:bg-neutral-900 p-4`}>
-      <div className="flex items-center gap-2 mb-3">
-        {icon}
-        <h4 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">{title}</h4>
-      </div>
-      <ul className="space-y-2">
+    <div className="rounded-2xl bg-raised/50 p-4">
+      <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+        <Icon className={cx('h-4 w-4', tone)} aria-hidden="true" />
+        {title}
+      </h3>
+      <ul className="flex flex-col gap-1.5">
         {items.map((item, i) => (
-          <li key={i} className="flex gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-            <span className={`size-1.5 rounded-full ${dotColor} mt-2 shrink-0`} />
+          <li key={i} className="flex gap-2 text-sm leading-relaxed text-fg/90">
+            <span className={cx('mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-current', tone)} aria-hidden="true" />
             {item}
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function CoachHeader({ children }: { children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br from-red-500 to-orange-500 text-neutral-950">
+        <Flame className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <h2 className="font-display text-lg font-semibold">Análisis de la semana</h2>
+      <span className="text-xs text-muted">· Coach IA</span>
+      {children}
     </div>
   );
 }
@@ -68,93 +70,61 @@ export default function WeeklyAnalysisSection() {
 
   if (loading) {
     return (
-      <section>
-        <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-red-500" />
-          Análisis Semanal
-        </h2>
-        <div className="flex justify-center py-8">
-          <Spinner />
+      <Card className="flex flex-col gap-4" aria-busy="true">
+        <CoachHeader />
+        <div className="flex flex-col gap-2" aria-hidden="true">
+          <span className="h-3 w-full rounded-full bg-raised motion-safe:animate-pulse" />
+          <span className="h-3 w-4/5 rounded-full bg-raised motion-safe:animate-pulse" />
+          <span className="h-3 w-3/5 rounded-full bg-raised motion-safe:animate-pulse" />
         </div>
-      </section>
+        <p className="sr-only" role="status">Cargando el análisis de la semana</p>
+      </Card>
     );
   }
 
-  if (error || feedbackCount === 0) {
+  if (error) {
     return (
-      <section>
-        <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-red-500" />
-          Análisis Semanal
-        </h2>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center py-6">
-          No hay feedback registrado esta semana. Registra tus resultados para obtener un análisis.
+      <Card className="flex flex-col gap-2">
+        <CoachHeader />
+        <p className="text-sm text-muted" role="alert">
+          No pudimos cargar el análisis de esta semana. Si ya usaste tus análisis del día, vuelve mañana.
         </p>
-      </section>
+      </Card>
     );
   }
 
-  if (!analysis) return null;
+  if (feedbackCount === 0 || !analysis) {
+    return (
+      <Card className="flex flex-col gap-2">
+        <CoachHeader />
+        <p className="text-sm text-muted">
+          Registra el resultado de tus entrenamientos de esta semana y aquí aparece el análisis de tu coach.
+        </p>
+      </Card>
+    );
+  }
 
   return (
-    <section>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-red-500" />
-          Análisis Semanal
-        </h2>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-500 dark:text-neutral-400">{feedbackCount} sesiones</span>
-          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${cargaBadge[analysis.carga_percibida] ?? ''}`}>
+    <Card className="flex flex-col gap-4 bg-linear-to-br from-accent-soft to-surface to-70%">
+      <CoachHeader>
+        <span className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-muted">{feedbackCount} sesiones</span>
+          <span className={cx('rounded-full px-2.5 py-1 text-xs font-semibold', CARGA_STYLE[analysis.carga_percibida])}>
             Carga {analysis.carga_percibida}
           </span>
-        </div>
+        </span>
+      </CoachHeader>
+
+      <p className="text-[15px] leading-relaxed">{analysis.resumen_semanal}</p>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <AnalysisList title="Logros" icon={Trophy} items={analysis.logros} tone="text-warmup" />
+        <AnalysisList title="Recomendaciones" icon={Lightbulb} items={analysis.recomendaciones_proxima_semana} tone="text-strength" />
+        <AnalysisList title="Áreas de atención" icon={AlertTriangle} items={analysis.areas_atencion} tone="text-metcon" />
+        <AnalysisList title="Tendencias" icon={TrendingUp} items={analysis.tendencias} tone="text-cooldown" />
       </div>
 
-      {/* Summary */}
-      <div className="rounded-xl border border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-900/10 p-4 mb-4">
-        <p className="text-sm text-neutral-700 dark:text-neutral-300">{analysis.resumen_semanal}</p>
-      </div>
-
-      {/* Cards grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <AnalysisCard
-          title="Logros"
-          icon={<Trophy className="h-4 w-4 text-emerald-500" />}
-          items={analysis.logros}
-          borderColor="border-emerald-200 dark:border-emerald-800/50"
-          dotColor="bg-emerald-500"
-        />
-        <AnalysisCard
-          title="Áreas de Atención"
-          icon={<AlertTriangle className="h-4 w-4 text-amber-500" />}
-          items={analysis.areas_atencion}
-          borderColor="border-amber-200 dark:border-amber-800/50"
-          dotColor="bg-amber-500"
-        />
-        <AnalysisCard
-          title="Recomendaciones"
-          icon={<Lightbulb className="h-4 w-4 text-blue-500" />}
-          items={analysis.recomendaciones_proxima_semana}
-          borderColor="border-blue-200 dark:border-blue-800/50"
-          dotColor="bg-blue-500"
-        />
-        <AnalysisCard
-          title="Tendencias"
-          icon={<TrendingUp className="h-4 w-4 text-red-500" />}
-          items={analysis.tendencias}
-          borderColor="border-red-200 dark:border-red-800/50"
-          dotColor="bg-red-500"
-        />
-      </div>
-
-      {/* Motivational note */}
-      <div className="rounded-xl bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 p-4 text-center">
-        <p className="text-sm italic text-neutral-600 dark:text-neutral-400">
-          &ldquo;{analysis.nota_motivacional}&rdquo;
-        </p>
-      </div>
-    </section>
+      <p className="text-sm italic text-muted">“{analysis.nota_motivacional}”</p>
+    </Card>
   );
 }

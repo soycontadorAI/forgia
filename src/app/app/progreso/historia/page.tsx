@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import type { SavedWod, WorkoutFeedback } from '@/types/wod';
 import { getWodHistory, deleteWod, getFeedbackForWod, getWodIdsWithFeedback } from '@/lib/wods';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +9,10 @@ import SegmentedButton from '@/components/ui/SegmentedButton';
 import WodListView from '@/components/WodListView';
 import CalendarView from '@/components/CalendarView';
 import Spinner from '@/components/Spinner';
+import { toast } from 'sonner';
+import { Card } from '@/components/ui/Card';
+import { Button, ButtonLink } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/Dialog';
 
 const WorkoutFeedbackForm = dynamic(() => import('@/components/WorkoutFeedbackForm'), { ssr: false });
 
@@ -25,9 +28,14 @@ export default function HistoriaPage() {
   const [wodsWithFeedback, setWodsWithFeedback] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>('Calendario');
   const [feedbackTarget, setFeedbackTarget] = useState<SavedWod | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const loadHistory = async () => {
+      setLoadError(false);
       try {
         const [data, feedbackIds] = await Promise.all([
           getWodHistory(),
@@ -37,12 +45,13 @@ export default function HistoriaPage() {
         setWodsWithFeedback(feedbackIds);
       } catch (e) {
         console.error('Error loading WOD history:', e);
+        setLoadError(true);
       } finally {
         setIsLoading(false);
       }
     };
     loadHistory();
-  }, []);
+  }, [reloadKey]);
 
   const handleExpand = useCallback(async (wodId: string) => {
     const isExpanding = expandedId !== wodId;
@@ -62,14 +71,24 @@ export default function HistoriaPage() {
     }
   }, [expandedId, feedbackMap]);
 
-  const handleDelete = useCallback(async (id: string) => {
+  // Borrar no se puede deshacer: primero se confirma
+  const handleDelete = useCallback((id: string) => setPendingDelete(id), []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
     try {
-      await deleteWod(id);
-      setSavedWods((prev) => prev.filter((s) => s.id !== id));
+      await deleteWod(pendingDelete);
+      setSavedWods((prev) => prev.filter((s) => s.id !== pendingDelete));
+      toast.success('WOD borrado');
+      setPendingDelete(null);
     } catch (e) {
       console.error('Error deleting WOD:', e);
+      toast.error('No se pudo borrar el WOD. Intenta de nuevo.');
+    } finally {
+      setDeleting(false);
     }
-  }, []);
+  }, [pendingDelete]);
 
   const handleFeedbackSaved = useCallback((feedback: WorkoutFeedback) => {
     const wodId = feedbackTarget?.id;
@@ -82,32 +101,35 @@ export default function HistoriaPage() {
 
   return (
     <>
-      <div data-print-hide className="mb-6">
-        <h2 className="text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">Historia</h2>
-        <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1">Tus WODs guardados</p>
-      </div>
-
       {isLoading ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : savedWods.length === 0 ? (
-        <div className="text-center py-16">
-          <h3 className="text-lg font-medium text-neutral-500 dark:text-neutral-400 mb-2">No hay WODs guardados</h3>
-          <p className="text-sm text-neutral-400 dark:text-neutral-500 mb-6">
-            Genera un WOD y guárdalo para verlo aquí.
-          </p>
-          <Link
-            href="/app"
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+      ) : loadError ? (
+        <Card className="flex flex-col items-start gap-3">
+          <p className="text-sm text-muted" role="alert">No pudimos cargar tu historia. Revisa tu conexión.</p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setIsLoading(true);
+              setReloadKey((k) => k + 1);
+            }}
           >
-            Ir a Generar WOD
-          </Link>
-        </div>
+            Reintentar
+          </Button>
+        </Card>
+      ) : savedWods.length === 0 ? (
+        <Card className="flex flex-col items-center gap-2 px-6 py-12 text-center">
+          <h2 className="font-display text-lg font-semibold">Todavía no hay WODs guardados</h2>
+          <p className="mb-2 max-w-xs text-sm text-muted">Genera un WOD y guárdalo; aquí aparece con su resultado.</p>
+          <ButtonLink href="/app" size="sm">Generar WOD</ButtonLink>
+        </Card>
       ) : (
         <>
           <div data-print-hide className="mb-6">
             <SegmentedButton
+              ariaLabel="Vista de la historia"
               options={['Calendario', 'Lista']}
               selected={viewMode}
               onSelect={(v) => setViewMode(v as ViewMode)}
@@ -138,6 +160,16 @@ export default function HistoriaPage() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+        loading={deleting}
+        title="¿Borrar este WOD?"
+        description="Se borra de tu historia y no se puede deshacer."
+        confirmLabel="Borrar WOD"
+      />
 
       {feedbackTarget && user && (
         <WorkoutFeedbackForm

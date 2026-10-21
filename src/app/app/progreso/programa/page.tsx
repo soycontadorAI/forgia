@@ -2,142 +2,144 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { CalendarRange, Check, ChevronDown, RefreshCw } from 'lucide-react';
 import type { MonthlyProgram, ProgramWeek, ProgramSession } from '@/types/program';
 import { getActiveProgram, getWodCountThisWeek, getCurrentWeekNumber } from '@/lib/programs';
 import { generateProgram } from '@/lib/ai-client';
 import Spinner from '@/components/Spinner';
 import LevelAssessmentCard from '@/components/LevelAssessmentCard';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/Dialog';
+import { cx } from '@/lib/cx';
 
-// --- SVG Icons ---
-
-const CalendarIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-);
-
-const RefreshIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-);
-
-const CheckCircleIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-);
-
-const LOADING_PHRASES = [
-  'Diseñando tu mesociclo personalizado...',
-  'Planificando las próximas 4 semanas...',
-  'Calculando volumen e intensidad...',
-  'Organizando sesiones de entrenamiento...',
-  'Periodizando como un coach de élite...',
+// Lo que de verdad pasa mientras se genera el programa
+const GENERATING_MESSAGES = [
+  'Revisando tu nivel, objetivos y frecuencia',
+  'Repartiendo volumen e intensidad en 4 semanas',
+  'Eligiendo el skill de cada semana',
+  'Ajustando la semana de deload',
 ];
 
-const intensityBadge: Record<string, string> = {
-  baja: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  moderada: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  alta: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  'muy alta': 'bg-red-200 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+const INTENSITY_STYLE: Record<string, string> = {
+  baja: 'bg-cooldown/12 text-cooldown',
+  moderada: 'bg-warmup/12 text-warmup',
+  alta: 'bg-metcon/12 text-metcon',
+  'muy alta': 'bg-accent-solid text-on-accent',
 };
 
-const weekAccent: Record<number, string> = {
-  1: 'border-l-blue-500',
-  2: 'border-l-amber-500',
-  3: 'border-l-red-500',
-  4: 'border-l-emerald-500',
-};
+// Altura relativa de la intensidad planeada por semana (base, volumen, intensidad, deload)
+const CURVE_Y = [56, 36, 14, 70];
 
-function SessionCard({ session, isCompleted, isCurrent }: { session: ProgramSession; isCompleted: boolean; isCurrent: boolean }) {
+function MesocycleCard({ weeks, currentWeek }: { weeks: ProgramWeek[]; currentWeek: number }) {
+  const W = 320;
+  const xs = weeks.map((_, i) => 30 + (i * (W - 60)) / Math.max(1, weeks.length - 1));
+  const points = weeks.map((_, i) => `${xs[i]},${CURVE_Y[i] ?? 40}`).join(' ');
+
   return (
-    <div
-      className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-        isCurrent
-          ? 'bg-red-50 dark:bg-red-900/10 ring-1 ring-red-500/30'
-          : isCompleted
-            ? 'bg-neutral-50 dark:bg-neutral-800/30 opacity-60'
-            : 'bg-white dark:bg-neutral-800/50'
-      }`}
-    >
-      {/* Session number */}
-      <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold shrink-0 ${
-        isCompleted
-          ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
-          : isCurrent
-            ? 'bg-red-500 text-white'
-            : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400'
-      }`}>
-        {isCompleted ? <CheckCircleIcon className="h-4 w-4" /> : session.order}
+    <Card className="flex flex-col gap-3">
+      <h2 className="font-display text-lg font-semibold">Mesociclo de 4 semanas</h2>
+      <svg viewBox={`0 0 ${W} 86`} className="h-20 w-full" role="img" aria-label={`Intensidad planeada: ${weeks.map((w) => `semana ${w.number}, ${w.focus}`).join('; ')}. Semana actual: ${currentWeek}.`}>
+        <polyline points={points} fill="none" className="stroke-line" strokeWidth="2" strokeDasharray="4 4" />
+        {weeks.map((w, i) => {
+          const isCurrent = w.number === currentWeek;
+          const isPast = w.number < currentWeek;
+          return (
+            <circle
+              key={w.number}
+              cx={xs[i]}
+              cy={CURVE_Y[i] ?? 40}
+              r={isCurrent ? 8 : 6}
+              strokeWidth={isCurrent ? 5 : 2}
+              className={cx(isCurrent ? 'fill-accent-solid stroke-accent-soft' : isPast ? 'fill-muted stroke-muted' : 'fill-raised stroke-line')}
+            />
+          );
+        })}
+      </svg>
+      <div className="grid gap-1 text-center" style={{ gridTemplateColumns: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
+        {weeks.map((w) => (
+          <div key={w.number} className="flex flex-col">
+            <span className={cx('text-xs', w.number === currentWeek ? 'text-accent' : 'text-muted')}>
+              Sem {w.number}
+              {w.number === currentWeek ? ' · hoy' : ''}
+            </span>
+            <span className={cx('truncate text-[13px]', w.number === currentWeek ? 'font-semibold' : 'text-muted')}>{w.focus}</span>
+          </div>
+        ))}
       </div>
+    </Card>
+  );
+}
 
-      {/* Details */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">{session.type}</span>
-          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${intensityBadge[session.intensity] ?? 'bg-neutral-100 text-neutral-600'}`}>
+function SessionRow({ session, isCompleted, isCurrent }: { session: ProgramSession; isCompleted: boolean; isCurrent: boolean }) {
+  return (
+    <li className={cx('flex min-h-14 items-center gap-3 border-b border-line py-2 last:border-b-0', isCompleted && 'opacity-60')}>
+      <span
+        className={cx(
+          'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+          isCompleted ? 'bg-cooldown/15 text-cooldown' : isCurrent ? 'border-2 border-accent text-accent' : 'bg-raised text-muted'
+        )}
+      >
+        {isCompleted ? <Check className="h-4 w-4" aria-label="Hecha" /> : session.order}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={cx('text-[15px]', isCurrent && 'font-semibold')}>{session.type}</span>
+          <span className={cx('rounded-full px-2 py-0.5 text-[11px] font-semibold', INTENSITY_STYLE[session.intensity] ?? 'bg-raised text-muted')}>
             {session.intensity}
           </span>
+          {isCurrent && <span className="text-xs text-accent">Siguiente</span>}
         </div>
-        <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">{session.emphasis}</p>
+        <p className="truncate text-xs text-muted">{session.emphasis}</p>
       </div>
-    </div>
+    </li>
   );
 }
 
 function WeekCard({ week, isCurrentWeek, completedSessions }: { week: ProgramWeek; isCurrentWeek: boolean; completedSessions: number }) {
   const [expanded, setExpanded] = useState(isCurrentWeek);
+  const panelId = `semana-${week.number}`;
 
   return (
-    <div
-      className={`rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden border-l-4 ${weekAccent[week.number] ?? 'border-l-neutral-400'} ${
-        isCurrentWeek ? 'ring-1 ring-red-500/20' : ''
-      }`}
-    >
-      {/* Header */}
+    <Card padding="none" className={cx('overflow-hidden', isCurrentWeek && 'ring-1 ring-accent/30')}>
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-4 text-left hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        className="flex w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-raised/50"
       >
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
-              Semana {week.number}
-            </span>
-            {isCurrentWeek && (
-              <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                Actual
-              </span>
-            )}
+            <span className="font-display font-semibold">Semana {week.number}</span>
+            <span className="text-sm text-muted">· {week.focus}</span>
+            {isCurrentWeek && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">Actual</span>}
           </div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-            {week.focus} · Skill: {week.skillFocus}
-          </p>
+          <p className="mt-0.5 truncate text-xs text-muted">Skill: {week.skillFocus}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           {isCurrentWeek && (
-            <span className="text-xs text-neutral-400 dark:text-neutral-500">
-              {completedSessions}/{week.sessions.length}
+            <span className="font-mono text-xs text-muted">
+              {Math.min(completedSessions, week.sessions.length)}/{week.sessions.length}
             </span>
           )}
-          <svg
-            className={`h-4 w-4 text-neutral-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          <ChevronDown className={cx('h-4 w-4 text-muted transition-transform', expanded && 'rotate-180')} aria-hidden="true" />
         </div>
       </button>
 
-      {/* Sessions */}
       {expanded && (
-        <div className="px-4 pb-4 space-y-2">
+        <ul id={panelId} className="px-4 pb-2">
           {week.sessions.map((session) => (
-            <SessionCard
+            <SessionRow
               key={session.order}
               session={session}
               isCompleted={isCurrentWeek && session.order <= completedSessions}
               isCurrent={isCurrentWeek && session.order === completedSessions + 1}
             />
           ))}
-        </div>
+        </ul>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -145,10 +147,10 @@ export default function ProgramaPage() {
   const [program, setProgram] = useState<MonthlyProgram | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-
   const [currentWeek, setCurrentWeek] = useState(1);
   const [wodsThisWeek, setWodsThisWeek] = useState(0);
-  const [loadingPhraseIndex, setLoadingPhraseIndex] = useState(0);
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -160,7 +162,7 @@ export default function ProgramaPage() {
         const count = await getWodCountThisWeek();
         setWodsThisWeek(count);
       } catch {
-        // ignore
+        toast.error('No pudimos cargar tu programa. Revisa tu conexión.');
       } finally {
         setLoading(false);
       }
@@ -168,19 +170,19 @@ export default function ProgramaPage() {
     load();
   }, []);
 
-  // Rotate loading phrases
   useEffect(() => {
     if (!generating) {
-      setLoadingPhraseIndex(0);
+      setMessageIndex(0);
       return;
     }
     const interval = setInterval(() => {
-      setLoadingPhraseIndex((prev) => (prev + 1) % LOADING_PHRASES.length);
-    }, 2000);
+      setMessageIndex((prev) => Math.min(prev + 1, GENERATING_MESSAGES.length - 1));
+    }, 4000);
     return () => clearInterval(interval);
   }, [generating]);
 
   const handleGenerate = useCallback(async () => {
+    setConfirmRegenerate(false);
     setGenerating(true);
     try {
       const result = await generateProgram();
@@ -195,8 +197,7 @@ export default function ProgramaPage() {
     }
   }, []);
 
-  const monthName = new Intl.DateTimeFormat('es-ES', { month: 'long' }).format(new Date());
-  const year = new Date().getFullYear();
+  const monthName = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(new Date());
 
   if (loading) {
     return (
@@ -207,65 +208,39 @@ export default function ProgramaPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">
-            Programa Mensual
-          </h2>
-          <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1 capitalize">
-            {monthName} {year}
-          </p>
-        </div>
-        {program && (
-          <button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg border-2 border-red-500 text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-          >
-            <RefreshIcon className="h-4 w-4" />
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted first-letter:uppercase">{monthName}</p>
+        {program && !generating && (
+          <Button variant="secondary" size="sm" onClick={() => setConfirmRegenerate(true)} icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}>
             Regenerar
-          </button>
+          </Button>
         )}
       </div>
 
-      {/* Level Assessment */}
-      <LevelAssessmentCard />
-
-      {/* Generating state */}
       {generating && (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
+        <Card className="flex flex-col items-center gap-3 py-12 text-center" role="status">
           <Spinner />
-          <p className="mt-4 text-sm text-neutral-500 dark:text-neutral-400 min-h-6 transition-opacity duration-300">
-            {LOADING_PHRASES[loadingPhraseIndex]}
-          </p>
-        </div>
+          <p className="text-sm text-muted">{GENERATING_MESSAGES[messageIndex]}…</p>
+        </Card>
       )}
 
-      {/* Empty state */}
       {!generating && !program && (
-        <div className="text-center py-16">
-          <CalendarIcon className="h-12 w-12 mx-auto text-neutral-300 dark:text-neutral-600 mb-4" />
-          <h3 className="text-lg font-medium text-neutral-500 dark:text-neutral-400 mb-2">
-            Sin programa activo
-          </h3>
-          <p className="text-sm text-neutral-400 dark:text-neutral-500 mb-8 max-w-md mx-auto">
-            Genera un programa de 4 semanas personalizado con progresión, variedad de sesiones y skill focus semanal.
+        <Card className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+          <CalendarRange className="h-10 w-10 text-muted" aria-hidden="true" />
+          <h2 className="font-display text-lg font-semibold">Sin programa este mes</h2>
+          <p className="max-w-sm text-sm text-muted">
+            Genera tu mesociclo de 4 semanas: base, volumen, intensidad y deload. Cada WOD diario sigue este plan.
           </p>
-          <button
-            onClick={handleGenerate}
-            className="inline-flex items-center gap-2 px-6 py-3 text-base font-bold uppercase tracking-wider text-white bg-red-500 rounded-xl hover:bg-red-600 shadow-lg shadow-red-500/25 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-neutral-900"
-          >
-            <CalendarIcon className="h-5 w-5" />
-            Generar Programa
-          </button>
-        </div>
+          <Button onClick={handleGenerate} icon={<CalendarRange className="h-4 w-4" aria-hidden="true" />}>
+            Generar programa
+          </Button>
+        </Card>
       )}
 
-      {/* Program grid */}
       {!generating && program && (
-        <div className="space-y-4">
+        <>
+          <MesocycleCard weeks={program.weeks} currentWeek={currentWeek} />
           {program.weeks.map((week) => (
             <WeekCard
               key={week.number}
@@ -274,10 +249,19 @@ export default function ProgramaPage() {
               completedSessions={week.number === currentWeek ? wodsThisWeek : 0}
             />
           ))}
-        </div>
+        </>
       )}
 
-      {/* Weekly analysis */}
+      <LevelAssessmentCard />
+
+      <ConfirmDialog
+        open={confirmRegenerate}
+        onClose={() => setConfirmRegenerate(false)}
+        onConfirm={handleGenerate}
+        title="¿Regenerar el programa?"
+        description="Se reemplaza el plan de este mes por uno nuevo. Tus WODs y resultados no se borran."
+        confirmLabel="Regenerar"
+      />
     </div>
   );
 }
