@@ -72,23 +72,31 @@ export async function requireUser(
   if (options.rateLimit) {
     rateLimit = await checkRateLimit(supabase, user.id, options.rateLimit);
     if (!rateLimit.allowed) {
-      return {
-        ok: false,
-        response: NextResponse.json(
-          { error: RATE_LIMIT_MESSAGES[options.rateLimit], remaining: 0, limit: rateLimit.limit },
-          {
-            status: 429,
-            headers: {
-              'X-RateLimit-Limit': String(rateLimit.limit),
-              'X-RateLimit-Remaining': '0',
-            },
-          }
-        ),
-      };
+      return { ok: false, response: rateLimitExceededResponse(options.rateLimit, rateLimit) };
     }
   }
 
   return { ok: true, user, supabase, rateLimit };
+}
+
+/**
+ * Respuesta 429 estándar. Exportada para rutas que aplican el rate limit
+ * después de autenticar (p. ej. cuando una respuesta en caché no lo consume).
+ */
+export function rateLimitExceededResponse(
+  action: RateLimitedAction,
+  rateLimit: RateLimitResult
+): NextResponse {
+  return NextResponse.json(
+    { error: RATE_LIMIT_MESSAGES[action], remaining: 0, limit: rateLimit.limit },
+    {
+      status: 429,
+      headers: {
+        'X-RateLimit-Limit': String(rateLimit.limit),
+        'X-RateLimit-Remaining': '0',
+      },
+    }
+  );
 }
 
 /**

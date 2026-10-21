@@ -58,6 +58,10 @@ export const metadata: Metadata = {
   },
 };
 
+// Aplica la clase `dark` antes de hidratar para evitar el flash de tema claro.
+// Misma lógica que ThemeContext: localStorage 'theme' y, si no hay, preferencia del sistema.
+const themeInitScript = `(function(){try{var t=localStorage.getItem('theme')||(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(t==='dark')document.documentElement.classList.add('dark')}catch(e){}})()`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -65,6 +69,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100`}
       >

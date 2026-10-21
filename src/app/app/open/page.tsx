@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ArrowLeft, Play, ClipboardCheck, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,8 +10,7 @@ import type { OpenDivision, OpenGender } from '@/lib/open-workouts';
 import type { WorkoutFeedback } from '@/types/wod';
 import { saveWod } from '@/lib/wods';
 import WodDisplay from '@/components/WodDisplay';
-import LiveWorkoutOverlay, { type LiveWorkoutResult } from '@/components/live/LiveWorkoutOverlay';
-import WorkoutFeedbackForm from '@/components/WorkoutFeedbackForm';
+import type { LiveWorkoutResult } from '@/components/live/LiveWorkoutOverlay';
 import CopyWodButton from '@/components/CopyWodButton';
 import PrintWodButton from '@/components/PrintWodButton';
 import OpenDivisionSelector from '@/components/open/OpenDivisionSelector';
@@ -19,6 +19,9 @@ import {
   trackOpenWorkoutStarted,
   trackWorkoutStarted,
 } from '@/lib/analytics';
+
+const LiveWorkoutOverlay = dynamic(() => import('@/components/live/LiveWorkoutOverlay'), { ssr: false });
+const WorkoutFeedbackForm = dynamic(() => import('@/components/WorkoutFeedbackForm'), { ssr: false });
 
 export default function OpenPage() {
   const { user, profile } = useAuth();

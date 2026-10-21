@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { getLatestAssessment, shouldSuggestAssessment } from '@/lib/assessments';
 import { getBenchmarkForLevel } from '@/lib/assessment-benchmarks';
@@ -8,9 +9,10 @@ import { startAssessment } from '@/lib/gemini';
 import type { LevelAssessment, BenchmarkWod } from '@/types/assessment';
 import { toast } from 'sonner';
 import WodDisplay from '@/components/WodDisplay';
-import AssessmentReportModal from '@/components/AssessmentReportModal';
-import LevelUpCelebration from '@/components/LevelUpCelebration';
 import type { ExperienceLevel } from '@/types/profile';
+
+const AssessmentReportModal = dynamic(() => import('@/components/AssessmentReportModal'), { ssr: false });
+const LevelUpCelebration = dynamic(() => import('@/components/LevelUpCelebration'), { ssr: false });
 
 // Icons
 const ShieldIcon = (props: React.SVGProps<SVGSVGElement>) => (

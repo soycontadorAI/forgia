@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { WeightUnit } from '@/types/profile';
 import type { PersonalRecord, PersonalRecordInput, RecordType, RecordUnit } from '@/types/personal-records';
-import { savePersonalRecord, getPersonalRecords, deletePersonalRecord } from '@/lib/personal-records';
+import { savePersonalRecord, getPersonalRecords, deletePersonalRecord, getBestRecord } from '@/lib/personal-records';
+import { dateToKey, parseDateKey } from '@/lib/dateUtils';
 import { MOVEMENT_CATEGORIES, ALL_MOVEMENTS } from '@/lib/movement-constants';
 import RMCalculator from '@/components/RMCalculator';
 import SegmentedButton from '@/components/ui/SegmentedButton';
@@ -37,7 +38,7 @@ export default function RecordsPage() {
     customMovement: '',
     recordType: '1RM' as RecordType,
     value: '',
-    date: new Date().toISOString().split('T')[0],
+    date: dateToKey(new Date()),
     notes: '',
   };
   const [form, setForm] = useState(initialFormState);
@@ -137,7 +138,7 @@ export default function RecordsPage() {
       ...prev,
       recordType: '1RM',
       value: String(estimated1RM),
-      date: new Date().toISOString().split('T')[0],
+      date: dateToKey(new Date()),
     }));
     setShowForm(true);
     // Scroll to form
@@ -294,7 +295,8 @@ export default function RecordsPage() {
         <div className="space-y-3">
           {Array.from(grouped.entries()).map(([movement, movementRecords]) => {
             const isExpanded = expandedMovement === movement;
-            const best = movementRecords[0]; // Already sorted by date desc
+            // Max of the primary record type (1RM first), not the latest entry
+            const best = getBestRecord(movementRecords) ?? movementRecords[0];
 
             return (
               <div
@@ -314,7 +316,7 @@ export default function RecordsPage() {
                         {movement}
                       </p>
                       <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                        Mejor: {formatRecordValue(best)} ({best.record_type}) — {new Date(best.date_achieved).toLocaleDateString('es-ES')}
+                        Mejor: {formatRecordValue(best)} ({best.record_type}) — {parseDateKey(best.date_achieved).toLocaleDateString('es-ES')}
                       </p>
                     </div>
                   </div>
@@ -347,7 +349,7 @@ export default function RecordsPage() {
                               {formatRecordValue(record)}
                             </p>
                             <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                              {new Date(record.date_achieved).toLocaleDateString('es-ES')}
+                              {parseDateKey(record.date_achieved).toLocaleDateString('es-ES')}
                               {record.notes && ` — ${record.notes}`}
                             </p>
                           </div>

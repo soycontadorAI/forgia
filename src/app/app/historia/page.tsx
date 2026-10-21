@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { SavedWod, WorkoutFeedback } from '@/types/wod';
 import { getWodHistory, deleteWod, getFeedbackForWod, getWodIdsWithFeedback } from '@/lib/wods';
@@ -8,8 +9,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import SegmentedButton from '@/components/ui/SegmentedButton';
 import WodListView from '@/components/WodListView';
 import CalendarView from '@/components/CalendarView';
-import WorkoutFeedbackForm from '@/components/WorkoutFeedbackForm';
 import Spinner from '@/components/Spinner';
+
+const WorkoutFeedbackForm = dynamic(() => import('@/components/WorkoutFeedbackForm'), { ssr: false });
 
 type ViewMode = 'Lista' | 'Calendario';
 

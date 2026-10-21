@@ -1,7 +1,7 @@
 # API de Forgia — Contrato para clientes
 
 Referencia de la superficie de API de forgia.fit, pensada para el cliente web
-y para la futura app nativa de iOS. Última actualización: 2026-06-10.
+y para la futura app nativa de iOS. Última actualización: 2026-10-20.
 
 ## Arquitectura de acceso a datos
 
@@ -50,7 +50,7 @@ Los usuarios con rol `admin` no tienen límite.
 |---|---|---|
 | `generate_wod` | `POST /api/generate-wod` | 5 |
 | `generate_program` | `POST /api/generate-program` | 2 |
-| `weekly_analysis` | `GET /api/weekly-analysis` | 5 |
+| `weekly_analysis` | `GET /api/weekly-analysis` (solo al regenerar, ver caché) | 5 |
 | `chat` | `POST /api/chat` | 20 |
 | `assessment` | `POST /api/assessments`, `POST /api/assessments/{id}/complete` | 10 |
 
@@ -137,6 +137,14 @@ feedback registrado.
 
 `analysis` es `null` si no hay feedback esta semana (`feedbackCount: 0`) o si
 la generación falló.
+
+**Caché**: el análisis se guarda por usuario y semana (tabla
+`weekly_analyses`, semana que inicia en lunes). Mientras el número de feedbacks
+de la semana no cambie, la ruta devuelve el análisis guardado sin llamar a la
+IA. Las respuestas desde caché **no consumen** el rate limit ni incluyen los
+headers `X-RateLimit-*`; solo se cuenta (y puede devolver `429`) cuando hay
+que regenerar porque no hay caché o llegó feedback nuevo. Sin feedback esta
+semana tampoco se consume el límite.
 
 ### GET /api/training-intelligence
 

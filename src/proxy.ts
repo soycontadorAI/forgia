@@ -25,9 +25,10 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims verifica el JWT localmente (JWKS) con llaves asimétricas;
+  // con llaves simétricas (HS256) cae a getUser() contra el servidor de Auth.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   // Protected routes: redirect to login if not authenticated
   if (request.nextUrl.pathname.startsWith('/app') && !user) {

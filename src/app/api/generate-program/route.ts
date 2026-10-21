@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
 import { requireUser, rateLimitHeaders } from '@/lib/api-auth';
 import { trackUsage } from '@/lib/rate-limit';
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await trackUsage(supabase, user.id, 'generate_program');
+    after(() => trackUsage(supabase, user.id, 'generate_program'));
     return NextResponse.json(
       {
         id: saved.id,
