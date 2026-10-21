@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import type { PersonalRecord, PersonalRecordInput } from '@/types/personal-records';
+import type { PersonalRecord, PersonalRecordInput, RecordType } from '@/types/personal-records';
 
 export async function savePersonalRecord(
   userId: string,
@@ -74,6 +74,38 @@ export async function getBestRecords(userId: string): Promise<PersonalRecord[]> 
     }
   }
 
+  return best;
+}
+
+// Priority of the record type shown as "Mejor" when a movement has several
+const PRIMARY_RECORD_TYPE_ORDER: RecordType[] = ['1RM', '3RM', '5RM', 'max_reps', 'time'];
+const LBS_TO_KG = 0.45359237;
+
+/** Comparable value: weights normalized to kg; time is negated so lower wins. */
+function comparableValue(record: PersonalRecord): number {
+  if (record.unit === 'lbs') return record.value * LBS_TO_KG;
+  if (record.record_type === 'time') return -record.value;
+  return record.value;
+}
+
+/**
+ * Best record of a single movement: picks the primary record type it has
+ * (1RM first) and returns the max within that type only, so 1RM/3RM/5RM
+ * are never compared against each other. Weights in kg and lbs are compared
+ * normalized; for `time` the lowest wins. Ties keep the first record
+ * (the most recent when the input is sorted by date desc).
+ */
+export function getBestRecord(records: PersonalRecord[]): PersonalRecord | null {
+  const primaryType = PRIMARY_RECORD_TYPE_ORDER.find((type) =>
+    records.some((r) => r.record_type === type)
+  );
+  if (!primaryType) return records[0] ?? null;
+
+  let best: PersonalRecord | null = null;
+  for (const record of records) {
+    if (record.record_type !== primaryType) continue;
+    if (!best || comparableValue(record) > comparableValue(best)) best = record;
+  }
   return best;
 }
 

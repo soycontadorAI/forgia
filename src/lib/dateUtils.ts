@@ -22,6 +22,16 @@ export function dateToKey(date: Date): string {
 }
 
 /**
+ * Parses a date-only "YYYY-MM-DD" string (e.g. a Postgres `date` column) as a
+ * local calendar date. `new Date('YYYY-MM-DD')` parses as UTC midnight and
+ * renders as the previous day in negative-offset timezones (e.g. Mexico).
+ */
+export function parseDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.slice(0, 10).split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
  * Groups SavedWod[] by their local calendar date.
  * Returns Map<"YYYY-MM-DD", SavedWod[]>.
  */
@@ -82,8 +92,7 @@ export function formatMonthYear(year: number, month: number): string {
  * e.g. "viernes, 6 de febrero de 2026"
  */
 export function formatFullDate(dateKey: string): string {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  const d = new Date(year, month - 1, day);
+  const d = parseDateKey(dateKey);
   const formatted = new Intl.DateTimeFormat('es-ES', {
     weekday: 'long',
     day: 'numeric',
