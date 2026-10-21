@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import type { ExperienceLevel, Objective, EquipmentLevel, WeightUnit } from '@/types/profile';
-import { ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { trackSignupComplete, trackOnboardingStep } from '@/lib/analytics';
 import StepIndicator from './StepIndicator';
 import Step1BasicInfo from './Step1BasicInfo';
@@ -72,12 +73,14 @@ export default function OnboardingWizard() {
       const nextStep = currentStep + 1;
       setCurrentStep(nextStep);
       trackOnboardingStep(nextStep);
+      window.scrollTo({ top: 0 });
     }
   };
 
   const handlePrev = () => {
     if (currentStep > 1) {
       setCurrentStep((prev) => prev - 1);
+      window.scrollTo({ top: 0 });
     }
   };
 
@@ -159,40 +162,55 @@ export default function OnboardingWizard() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <StepIndicator currentStep={currentStep} onBack={handlePrev} />
+    // En móvil la barra de acciones va fija: el padding inferior evita que tape el contenido
+    <div className="mx-auto max-w-xl pb-28 sm:pb-0">
+      <StepIndicator currentStep={currentStep} />
 
-      <div className="min-h-[320px]">
-        {renderStep()}
-      </div>
+      <div className="min-h-[320px]">{renderStep()}</div>
 
       {error && (
-        <div className="mt-4 bg-red-100 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg text-sm">
+        <div role="alert" className="mt-4 rounded-2xl bg-accent-soft px-4 py-3 text-sm text-accent">
           {error}
         </div>
       )}
 
-      <div className="flex justify-end mt-8 pt-6 border-t border-neutral-200 dark:border-neutral-700">
-        {currentStep < 4 ? (
-          <button
-            type="button"
-            onClick={handleNext}
-            disabled={!isStepValid(currentStep)}
-            className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:bg-red-300 dark:disabled:bg-red-500/30 disabled:cursor-not-allowed"
-          >
-            Siguiente
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!isStepValid(4) || isSubmitting}
-            className="px-6 py-2.5 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:bg-red-300 dark:disabled:bg-red-500/30 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? 'Guardando...' : 'Completar'}
-          </button>
-        )}
+      {/*
+        Barra de acciones: fija sobre la barra de pestañas en móvil, en línea desde sm.
+        Es opaca y queda por encima del botón del Coach IA (z-30), que en este paso estorbaría.
+        Si la barra de pestañas no está (--tabbar-h: 0), respeta el área segura inferior.
+      */}
+      <div className="fixed inset-x-0 bottom-(--tabbar-h) z-35 border-t border-line bg-ground px-4 pt-3 pb-[max(1rem,calc(env(safe-area-inset-bottom,0px)-var(--tabbar-h)+1rem))] sm:static sm:z-auto sm:mt-8 sm:border-0 sm:bg-transparent sm:px-0 sm:pt-0 sm:pb-0">
+        <div className="mx-auto flex max-w-xl gap-3">
+          {currentStep > 1 && (
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={handlePrev}
+              disabled={isSubmitting}
+              icon={<ArrowLeft className="h-5 w-5" aria-hidden="true" />}
+              className="px-5"
+            >
+              Atrás
+            </Button>
+          )}
+          {currentStep < 4 ? (
+            <Button size="lg" onClick={handleNext} disabled={!isStepValid(currentStep)} className="flex-1">
+              Siguiente
+              <ArrowRight className="h-5 w-5" aria-hidden="true" />
+            </Button>
+          ) : (
+            <Button
+              size="lg"
+              onClick={handleSubmit}
+              disabled={!isStepValid(4)}
+              loading={isSubmitting}
+              icon={<Check className="h-5 w-5" aria-hidden="true" />}
+              className="flex-1"
+            >
+              {isSubmitting ? 'Guardando...' : 'Completar'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

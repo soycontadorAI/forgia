@@ -1,8 +1,11 @@
 'use client';
 
 import type { Objective } from '@/types/profile';
+import { useId } from 'react';
 import { OBJECTIVES, INCOMPATIBLE_OBJECTIVES } from '@/lib/training-constants';
-import { CircleCheck, Square, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
+import StepHeader from './StepHeader';
+import { ToggleCard } from './OptionCard';
 
 interface Step2Props {
   selectedObjectives: Objective[];
@@ -10,6 +13,8 @@ interface Step2Props {
 }
 
 export default function Step2Objectives({ selectedObjectives, onChange }: Step2Props) {
+  const descriptionId = useId();
+  const messageId = useId();
   const isSelected = (obj: Objective) => selectedObjectives.includes(obj);
 
   const isDisabled = (obj: Objective) => {
@@ -49,64 +54,38 @@ export default function Step2Objectives({ selectedObjectives, onChange }: Step2P
   const incompatibleMessage = getIncompatibleMessage();
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-          ¿Cuáles son tus objetivos?
-        </h2>
-        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-          Selecciona 1 o 2 objetivos
-        </p>
+    <fieldset aria-describedby={descriptionId}>
+      <StepHeader
+        as="legend"
+        title="¿Cuáles son tus objetivos?"
+        description="Selecciona 1 o 2 objetivos"
+        descriptionId={descriptionId}
+      />
+
+      <div className="mt-5 flex flex-col gap-2">
+        {OBJECTIVES.map(({ value, icon: Icon, description }) => (
+          <ToggleCard
+            key={value}
+            pressed={isSelected(value)}
+            unavailable={isDisabled(value)}
+            describedBy={incompatibleMessage ? messageId : descriptionId}
+            onToggle={() => handleToggle(value)}
+            leading={<Icon className="h-5 w-5" />}
+            title={value}
+            description={description}
+          />
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-2">
-        {OBJECTIVES.map(({ value, icon: Icon, description }) => {
-          const selected = isSelected(value);
-          const disabled = isDisabled(value);
-
-          return (
-            <button
-              key={value}
-              type="button"
-              onClick={() => handleToggle(value)}
-              disabled={disabled}
-              className={`flex items-center gap-4 p-4 rounded-lg border transition-all duration-200 text-left ${
-                selected
-                  ? 'border-red-500 bg-red-50 dark:bg-red-500/10'
-                  : disabled
-                    ? 'border-neutral-200 dark:border-neutral-700 opacity-40 cursor-not-allowed'
-                    : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
-              }`}
-            >
-              <Icon className={`w-5 h-5 shrink-0 ${selected ? 'text-red-500' : 'text-neutral-400 dark:text-neutral-500'}`} />
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${
-                  selected ? 'text-red-600 dark:text-red-400' : 'text-neutral-900 dark:text-neutral-100'
-                }`}>
-                  {value}
-                </p>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                  {description}
-                </p>
-              </div>
-              {selected ? (
-                <CircleCheck className="w-5 h-5 text-red-500 shrink-0" />
-              ) : (
-                <Square className="w-5 h-5 text-neutral-300 dark:text-neutral-600 shrink-0" />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {incompatibleMessage && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30">
-          <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-700 dark:text-amber-300">
+      {/* Contenedor siempre presente para que el aviso se anuncie al aparecer */}
+      <div role="status" className="mt-3">
+        {incompatibleMessage && (
+          <p id={messageId} className="flex items-start gap-2 rounded-2xl bg-surface px-4 py-3 text-sm text-muted">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-warmup" aria-hidden="true" />
             {incompatibleMessage}
           </p>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </fieldset>
   );
 }
