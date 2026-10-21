@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
+import { partialParse } from '@anthropic-ai/sdk/_vendor/partial-json-parser/parser';
 import type { z } from 'zod';
 
 // Modelo por ruta: Opus donde la calidad del plan importa, Sonnet para el chat
@@ -123,6 +124,59 @@ export async function generateStructured<T extends z.ZodType>({
     throw new AIIncompleteError(response.stop_reason);
   }
   return response.parsed_output as z.infer<T>;
+}
+
+interface StreamStructuredRequest<T extends z.ZodType> extends StructuredRequest<T> {
+  /** Recibe el objeto parcial conforme el modelo escribe el JSON */
+  onPartial: (partial: unknown) => void;
+  /** Mínimo de ms entre parciales, para no saturar al cliente */
+  throttleMs?: number;
+}
+
+/**
+ * Como generateStructured, pero va entregando el JSON parcial mientras se
+ * genera. El resultado final se valida contra el mismo esquema.
+ */
+export async function streamStructured<T extends z.ZodType>({
+  route,
+  model,
+  system,
+  user,
+  schema,
+  effort,
+  maxTokens = 16000,
+  onPartial,
+  throttleMs = 150,
+}: StreamStructuredRequest<T>): Promise<z.infer<T>> {
+  const stream = getAnthropic().beta.messages.stream({
+    model,
+    max_tokens: maxTokens,
+    ...fallbackParams(model),
+    system,
+    messages: [{ role: 'user', content: user }],
+    output_config: { effort, format: betaZodOutputFormat(schema) },
+  });
+
+  let lastEmit = 0;
+  stream.on('text', (_delta, snapshot) => {
+    const now = Date.now();
+    if (now - lastEmit < throttleMs) return;
+    lastEmit = now;
+    try {
+      onPartial(partialParse(snapshot));
+    } catch {
+      // JSON todavía no parseable; llega en el siguiente delta
+    }
+  });
+
+  const message = await stream.finalMessage();
+  logUsage(route, model, message.usage);
+
+  const text = message.content.find((block) => block.type === 'text');
+  if (message.stop_reason !== 'end_turn' || !text || text.type !== 'text') {
+    throw new AIIncompleteError(message.stop_reason);
+  }
+  return schema.parse(JSON.parse(text.text));
 }
 
 interface ChatStreamRequest {

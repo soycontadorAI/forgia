@@ -18,6 +18,15 @@ export interface Wod {
   coolDown: WodSection;
 }
 
+/** WOD a medio generar durante el streaming: cualquier campo puede faltar. */
+export type PartialWod = {
+  title?: string;
+  warmUp?: Partial<WodSection>;
+  strengthSkill?: Partial<WodSection>;
+  metcon?: Partial<WodSection>;
+  coolDown?: Partial<WodSection>;
+};
+
 export interface GenerateWodRequest {
   sessionNotes?: string;
 }

@@ -312,11 +312,6 @@ body {
     margin-bottom: 12pt;
   }
 
-  /* Keep accent bar visible in print with neutral color */
-  .print-card > div:first-child {
-    background-color: #a3a3a3 !important;
-  }
-
   h1,
   h2,
   h3,

@@ -91,7 +91,24 @@ feedback/WODs, el programa activo y los PRs del usuario.
 }
 ```
 
-**Errores propios**: `400` si el usuario no tiene perfil (onboarding incompleto).
+**Errores propios**: `400` si el usuario no tiene perfil (onboarding incompleto),
+`503` si el servicio de IA está saturado.
+
+**Streaming (opcional)**: con el header `Accept: application/x-ndjson` la
+respuesta es `200` con una línea JSON por evento, para mostrar el WOD conforme
+se genera (el primer contenido llega en ~10 s; el WOD completo, en ~25 s):
+
+```
+{"type":"status","stage":"thinking"}
+{"type":"partial","wod":{ "title": "...", "warmUp": { ... } }}   ← se repite; cualquier campo puede faltar
+{"type":"done","wod":{ ...Wod completo y validado... }}
+```
+
+Si algo falla después de empezar, el último evento es
+`{"type":"error","error":"<mensaje en español>"}` (el status HTTP ya fue 200).
+Auth, rate limit y errores de validación siguen respondiendo con su status
+normal antes de abrir el stream. El uso cuenta contra el límite solo al llegar
+a `done`.
 
 > El cliente decide si guarda el WOD (insert en `wods` vía Supabase).
 
