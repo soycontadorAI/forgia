@@ -90,6 +90,7 @@ export default function PrivacidadPage() {
       </p>
       <ul className="list-disc list-inside space-y-2 mb-4 text-neutral-700 dark:text-neutral-300">
         <li><strong>Cookies de sesión:</strong> Necesarias para la autenticación y mantenimiento de su sesión activa.</li>
+        <li><strong>Notificaciones push:</strong> Si activa los recordatorios, guardamos la suscripción de su navegador (una dirección técnica del servicio de avisos), su zona horaria y la hora elegida, sólo para enviarle el aviso de entrenamiento. Puede desactivarlos en Cuenta → Recordatorios.</li>
         <li><strong>Almacenamiento local (localStorage):</strong> Utilizado para guardar preferencias de tema (modo claro/oscuro) y datos temporales de la aplicación.</li>
       </ul>
 

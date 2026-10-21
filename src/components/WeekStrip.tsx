@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Check, Flame } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWeekConsistency, RESULT_SAVED_EVENT, type WeekConsistency } from '@/lib/consistency';
+import { getPushState } from '@/lib/push';
 import { Card, Eyebrow } from '@/components/ui/Card';
 import { cx } from '@/lib/cx';
 
@@ -31,6 +32,7 @@ function statusMessage(w: WeekConsistency): string {
 export default function WeekStrip() {
   const { user, profile } = useAuth();
   const [week, setWeek] = useState<WeekConsistency | null>(null);
+  const [canEnableReminder, setCanEnableReminder] = useState(false);
   const goal = profile?.training_frequency ?? null;
 
   const load = useCallback(() => {
@@ -41,6 +43,12 @@ export default function WeekStrip() {
         // Sin la tira de la semana si falla: el resto de Hoy sigue funcionando
       });
   }, [user, goal]);
+
+  useEffect(() => {
+    getPushState()
+      .then((state) => setCanEnableReminder(state.status === 'off' || state.status === 'needs-install'))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     load();
@@ -98,9 +106,16 @@ export default function WeekStrip() {
         <p className={cx('text-sm', met ? 'text-cooldown' : 'text-muted')} role="status">
           {statusMessage(week)}
         </p>
-        <Link href="/app/perfil" className="text-xs text-muted underline underline-offset-2 hover:text-fg">
-          Cambiar meta
-        </Link>
+        <span className="flex gap-3">
+          {canEnableReminder && (
+            <Link href="/app/cuenta#recordatorios" className="text-xs text-accent underline underline-offset-2">
+              Activar aviso
+            </Link>
+          )}
+          <Link href="/app/perfil" className="text-xs text-muted underline underline-offset-2 hover:text-fg">
+            Cambiar meta
+          </Link>
+        </span>
       </div>
     </Card>
   );
