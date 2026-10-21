@@ -1,76 +1,85 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useId, useState } from 'react';
 import { toast } from 'sonner';
-import type { WodTemplate, TemplateResultInput, ScoringType } from '@/types/wod-template';
-import type { ExperienceLevel } from '@/types/profile';
+import { ArrowUp } from 'lucide-react';
+import type { WodTemplate, TemplateResultInput } from '@/types/wod-template';
 import { saveTemplateResult } from '@/lib/template-results';
 import { checkLevelSuggestion, type LevelSuggestion } from '@/lib/level-suggestions';
 import { updateProfile } from '@/lib/profiles';
 import { useAuth } from '@/contexts/AuthContext';
-import SegmentedButton from '@/components/ui/SegmentedButton';
-import { ArrowUp } from 'lucide-react';
+import { Dialog } from '@/components/ui/Dialog';
+import { Button } from '@/components/ui/Button';
+import { TextAreaField, TextField } from '@/components/ui/Field';
+import { cx } from '@/lib/cx';
 
-const XIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-  </svg>
-);
+type RxOrScaled = 'Rx' | 'Scaled';
+
+const SCORE_LABELS: Record<Exclude<WodTemplate['scoringType'], 'time'>, { label: string; placeholder: string; missing: string }> = {
+  rounds: { label: 'Rondas completadas', placeholder: '15', missing: 'Escribe cuántas rondas completaste.' },
+  reps: { label: 'Repeticiones totales', placeholder: '100', missing: 'Escribe tus repeticiones totales.' },
+  weight: { label: 'Peso', placeholder: '100', missing: 'Escribe el peso que levantaste.' },
+};
 
 interface TemplateResultFormProps {
+  open: boolean;
   template: WodTemplate;
   userId: string;
   onSaved: () => void;
   onClose: () => void;
+  /** Minutos que marcó el modo en vivo; prellenan el tiempo */
   initialTime?: number | null;
 }
 
-export default function TemplateResultForm({ template, userId, onSaved, onClose, initialTime }: TemplateResultFormProps) {
+function initialTimeParts(initialTime: number | null | undefined, isTime: boolean) {
+  if (!initialTime || !isTime) return { minutes: '', seconds: '' };
+  const totalSeconds = Math.round(initialTime * 60);
+  return { minutes: String(Math.floor(totalSeconds / 60)), seconds: String(totalSeconds % 60) };
+}
+
+export default function TemplateResultForm({ open, template, userId, onSaved, onClose, initialTime }: TemplateResultFormProps) {
   const { profile, refreshProfile } = useAuth();
+  const isTime = template.scoringType === 'time';
+  const formId = useId();
+  const timeErrorId = useId();
+
   const [scoreValue, setScoreValue] = useState('');
-  const [minutes, setMinutes] = useState('');
-  const [seconds, setSeconds] = useState('');
-  const [rxOrScaled, setRxOrScaled] = useState<'Rx' | 'Scaled'>('Rx');
+  const [minutes, setMinutes] = useState(() => initialTimeParts(initialTime, isTime).minutes);
+  const [seconds, setSeconds] = useState(() => initialTimeParts(initialTime, isTime).seconds);
+  const [rxOrScaled, setRxOrScaled] = useState<RxOrScaled>('Rx');
   const [notes, setNotes] = useState('');
+  const [scoreError, setScoreError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [levelSuggestion, setLevelSuggestion] = useState<LevelSuggestion | null>(null);
-  const [showSuggestion, setShowSuggestion] = useState(false);
+  const [isUpdatingLevel, setIsUpdatingLevel] = useState(false);
 
-  // Body scroll lock
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
-
-  // Pre-fill time if available
-  useEffect(() => {
-    if (initialTime && template.scoringType === 'time') {
-      const totalSeconds = Math.round(initialTime * 60);
-      setMinutes(String(Math.floor(totalSeconds / 60)));
-      setSeconds(String(totalSeconds % 60));
-    }
-  }, [initialTime, template.scoringType]);
-
-  const getScoreValue = (): number | null => {
-    if (template.scoringType === 'time') {
-      const m = parseInt(minutes, 10) || 0;
-      const s = parseInt(seconds, 10) || 0;
+  /** Devuelve el score o el mensaje de error que hay que mostrar */
+  const validate = (): { value: number } | { error: string } => {
+    if (isTime) {
+      const m = minutes.trim() === '' ? 0 : Number(minutes);
+      const s = seconds.trim() === '' ? 0 : Number(seconds);
+      if (!Number.isInteger(m) || m < 0) return { error: 'Los minutos deben ser un número entero.' };
+      if (!Number.isInteger(s) || s < 0 || s > 59) return { error: 'Los segundos van de 0 a 59.' };
       const total = m * 60 + s;
-      return total > 0 ? total : null;
+      return total > 0 ? { value: total } : { error: 'Escribe tu tiempo final.' };
     }
-    const val = parseFloat(scoreValue);
-    return val > 0 ? val : null;
+    const config = SCORE_LABELS[template.scoringType as keyof typeof SCORE_LABELS];
+    if (scoreValue.trim() === '') return { error: config.missing };
+    const val = Number(scoreValue);
+    if (!Number.isFinite(val) || val <= 0) return { error: 'Debe ser un número mayor que 0.' };
+    return { value: val };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
 
-    const value = getScoreValue();
-    if (value === null) return;
+    const check = validate();
+    if ('error' in check) {
+      setScoreError(check.error);
+      return;
+    }
+    const value = check.value;
 
     setIsSaving(true);
     try {
@@ -85,18 +94,12 @@ export default function TemplateResultForm({ template, userId, onSaved, onClose,
       await saveTemplateResult(userId, input);
       toast.success('Resultado guardado correctamente.');
 
-      // Check level suggestion
+      // Si la marca sugiere subir de nivel, se ofrece antes de cerrar
       if (profile?.experience_level) {
-        const suggestion = checkLevelSuggestion(
-          template.id,
-          value,
-          rxOrScaled,
-          profile.experience_level
-        );
+        const suggestion = checkLevelSuggestion(template.id, value, rxOrScaled, profile.experience_level);
         if (suggestion) {
           setLevelSuggestion(suggestion);
-          setShowSuggestion(true);
-          return; // Don't close yet, show suggestion first
+          return;
         }
       }
 
@@ -112,6 +115,7 @@ export default function TemplateResultForm({ template, userId, onSaved, onClose,
   const handleAcceptLevelSuggestion = async () => {
     if (!levelSuggestion || !profile) return;
 
+    setIsUpdatingLevel(true);
     try {
       await updateProfile(profile.id, {
         display_name: profile.display_name || '',
@@ -125,141 +129,166 @@ export default function TemplateResultForm({ template, userId, onSaved, onClose,
       await refreshProfile();
     } catch (err) {
       console.error('Error updating level:', err);
+      toast.error('No se pudo actualizar tu nivel.');
+    } finally {
+      setIsUpdatingLevel(false);
     }
 
     onSaved();
   };
 
-  // Show level suggestion screen
-  if (showSuggestion && levelSuggestion) {
+  // Paso 2: el resultado ya se guardó; cerrar equivale a "No, gracias"
+  if (levelSuggestion) {
     return (
-      <div className="fixed inset-0 z-50 bg-neutral-950 flex flex-col items-center justify-center px-6">
-        <div className="max-w-md w-full text-center space-y-6">
-          <ArrowUp className="w-12 h-12 text-amber-400 mx-auto" />
-          <h2 className="text-xl font-bold text-white">Subida de nivel detectada</h2>
-          <p className="text-sm text-neutral-300">
-            {levelSuggestion.reason}
-          </p>
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={handleAcceptLevelSuggestion}
-              className="w-full py-3 text-sm font-bold uppercase tracking-wider text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors"
-            >
-              Actualizar a {levelSuggestion.suggestedLevel}
-            </button>
-            <button
-              onClick={onSaved}
-              className="w-full py-3 text-sm font-medium text-neutral-400 hover:text-white transition-colors"
-            >
+      <Dialog
+        open={open}
+        onClose={onSaved}
+        title="Subida de nivel detectada"
+        footer={
+          <>
+            <Button variant="secondary" onClick={onSaved} disabled={isUpdatingLevel}>
               No, gracias
-            </button>
-          </div>
+            </Button>
+            <Button onClick={handleAcceptLevelSuggestion} loading={isUpdatingLevel}>
+              Actualizar a {levelSuggestion.suggestedLevel}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
+            <ArrowUp className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <p className="text-[15px] leading-relaxed text-fg">{levelSuggestion.reason}</p>
         </div>
-      </div>
+      </Dialog>
     );
   }
 
+  const scoreConfig = isTime ? null : SCORE_LABELS[template.scoringType as keyof typeof SCORE_LABELS];
+
   return (
-    <div className="fixed inset-0 z-50 bg-neutral-950 flex flex-col overflow-y-auto">
-      {/* Header */}
-      <header className="flex items-center justify-between p-4 pt-6 shrink-0">
-        <h2 className="text-lg font-bold text-white">Registrar Resultado</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="size-10 rounded-full bg-white/5 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white transition-colors"
-          aria-label="Cerrar"
-        >
-          <XIcon />
-        </button>
-      </header>
-
-      {/* Content */}
-      <div className="flex-1 px-6 pb-8">
-        <div className="max-w-lg mx-auto w-full">
-          <p className="text-sm text-neutral-500 mb-6">{template.name}</p>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Score input */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
-                {template.scoringType === 'time' ? 'Tiempo' : template.scoringType === 'rounds' ? 'Rondas completadas' : 'Score'}
-              </label>
-              {template.scoringType === 'time' ? (
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="number"
-                    min={0}
-                    value={minutes}
-                    onChange={(e) => setMinutes(e.target.value)}
-                    placeholder="00"
-                    className="w-20 px-3 py-2 text-sm text-center rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                  <span className="text-neutral-400 font-bold">:</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={59}
-                    value={seconds}
-                    onChange={(e) => setSeconds(e.target.value)}
-                    placeholder="00"
-                    className="w-20 px-3 py-2 text-sm text-center rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                  <span className="text-xs text-neutral-500">min : seg</span>
-                </div>
-              ) : (
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={scoreValue}
-                  onChange={(e) => setScoreValue(e.target.value)}
-                  placeholder={template.scoringType === 'rounds' ? '15' : '100'}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-              )}
-            </div>
-
-            {/* Rx/Scaled */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
-                Modalidad
-              </label>
-              <SegmentedButton
-                options={['Rx', 'Scaled']}
-                selected={rxOrScaled}
-                onSelect={(v) => setRxOrScaled(v as 'Rx' | 'Scaled')}
+    <Dialog
+      open={open}
+      onClose={() => {
+        if (!isSaving) onClose();
+      }}
+      title="Registrar resultado"
+      description={template.name}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isSaving}>
+            Cancelar
+          </Button>
+          <Button type="submit" form={formId} loading={isSaving}>
+            {isSaving ? 'Guardando…' : 'Guardar resultado'}
+          </Button>
+        </>
+      }
+    >
+      <form id={formId} onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+        {isTime ? (
+          <fieldset className="flex flex-col gap-1.5" aria-describedby={scoreError ? timeErrorId : undefined}>
+            <legend className="mb-1.5 text-sm font-medium text-fg">Tiempo final</legend>
+            <div className="flex items-start gap-2">
+              <TextField
+                label="Minutos"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={minutes}
+                onChange={(e) => {
+                  setMinutes(e.target.value);
+                  setScoreError(null);
+                }}
+                placeholder="00"
+                className="flex-1"
+                aria-invalid={scoreError ? true : undefined}
+                aria-describedby={scoreError ? timeErrorId : undefined}
               />
-              <p className="text-xs text-neutral-500 mt-1.5">
-                Rx: {template.rxStandard.men} (H) / {template.rxStandard.women} (M)
+              <span className="mt-10 font-display text-xl font-bold text-muted" aria-hidden="true">
+                :
+              </span>
+              <TextField
+                label="Segundos"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={59}
+                value={seconds}
+                onChange={(e) => {
+                  setSeconds(e.target.value);
+                  setScoreError(null);
+                }}
+                placeholder="00"
+                className="flex-1"
+                aria-invalid={scoreError ? true : undefined}
+                aria-describedby={scoreError ? timeErrorId : undefined}
+              />
+            </div>
+            {scoreError && (
+              <p id={timeErrorId} role="alert" className="text-xs font-medium text-accent">
+                {scoreError}
               </p>
-            </div>
+            )}
+          </fieldset>
+        ) : (
+          scoreConfig && (
+            <TextField
+              label={scoreConfig.label}
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="any"
+              value={scoreValue}
+              onChange={(e) => {
+                setScoreValue(e.target.value);
+                setScoreError(null);
+              }}
+              placeholder={scoreConfig.placeholder}
+              error={scoreError ?? undefined}
+            />
+          )
+        )}
 
-            {/* Notes */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
-                Notas <span className="font-normal text-neutral-500">(opcional)</span>
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="mb-1.5 text-sm font-medium text-fg">Modalidad</legend>
+          <div className="grid grid-cols-2 gap-1 rounded-full bg-ground p-1">
+            {(['Rx', 'Scaled'] as const).map((option) => (
+              <label
+                key={option}
+                className={cx(
+                  'flex min-h-11 cursor-pointer items-center justify-center rounded-full text-sm transition-colors',
+                  'has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-accent',
+                  rxOrScaled === option ? 'bg-fg font-semibold text-ground' : 'text-muted hover:text-fg'
+                )}
+              >
+                <input
+                  type="radio"
+                  name={`${formId}-modalidad`}
+                  value={option}
+                  checked={rxOrScaled === option}
+                  onChange={() => setRxOrScaled(option)}
+                  className="sr-only"
+                />
+                {option}
               </label>
-              <input
-                type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ej: Partí en sets de 7..."
-                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
-            </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted">
+            Rx: {template.rxStandard.men} (H) · {template.rxStandard.women} (M)
+          </p>
+        </fieldset>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isSaving || getScoreValue() === null}
-              className="w-full py-3 text-sm font-bold uppercase tracking-wider text-white bg-red-500 rounded-xl hover:bg-red-600 shadow-lg shadow-red-500/25 transition-all duration-200 disabled:opacity-60"
-            >
-              {isSaving ? 'Guardando...' : 'Guardar Resultado'}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
+        <TextAreaField
+          label="Notas (opcional)"
+          rows={2}
+          maxLength={500}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Ej: Partí en sets de 7…"
+        />
+      </form>
+    </Dialog>
   );
 }
