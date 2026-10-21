@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { getLatestAssessment, shouldSuggestAssessment } from '@/lib/assessments';
 import { getBenchmarkForLevel } from '@/lib/assessment-benchmarks';
-import { startAssessment } from '@/lib/gemini';
+import { startAssessment } from '@/lib/ai-client';
 import type { LevelAssessment, BenchmarkWod } from '@/types/assessment';
 import { toast } from 'sonner';
 import WodDisplay from '@/components/WodDisplay';

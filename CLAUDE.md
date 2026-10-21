@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Forgia** ("forjar" in Italian) is a CrossFit AI coaching app at forgia.fit. It generates personalized WODs (Workout of the Day) using Google Gemini, tracks performance, manages periodization, and provides training intelligence. All user-facing text is in **Spanish** (es_MX locale).
+**Forgia** ("forjar" in Italian) is a CrossFit AI coaching app at forgia.fit. It generates personalized WODs (Workout of the Day) using Claude (Anthropic), tracks performance, manages periodization, and provides training intelligence. All user-facing text is in **Spanish** (es_MX locale).
 
 ## Commands
 
@@ -22,7 +22,7 @@ No test framework is configured.
 ```
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-GEMINI_API_KEY=...                # Server-side only
+ANTHROPIC_API_KEY=...             # Server-side only
 NEXT_PUBLIC_GA_ID=...             # Optional, GA4
 ```
 
@@ -31,7 +31,7 @@ NEXT_PUBLIC_GA_ID=...             # Optional, GA4
 - **Next.js 16** (App Router) + **React 19** + **TypeScript 5**
 - **Tailwind CSS 4** via PostCSS (no tailwind.config — uses CSS-based config in `globals.css`)
 - **Supabase** for PostgreSQL database + auth (email/password)
-- **Google Gemini** (`@google/genai`) for AI workout generation — server-side only
+- **Claude** (`@anthropic-ai/sdk`; model per route in `AI_MODELS`: Opus 5.5 for WOD/program, Sonnet 5.5 for chat, Haiku 5.5 for weekly analysis) for AI generation — server-side only, shared client in `src/lib/ai/claude.ts`, Zod output schemas in `src/lib/ai/schemas.ts`
 - **pnpm** as package manager
 - Path alias: `@/*` maps to `./src/*`
 
@@ -47,9 +47,9 @@ NEXT_PUBLIC_GA_ID=...             # Optional, GA4
 
 ### Data Flow
 
-- **Client components** call `src/lib/gemini.ts` helper functions (thin fetch wrappers)
-- These hit **API routes** at `src/app/api/*` which use the Supabase server client and Gemini
-- Gemini API key is never exposed to the client — all AI calls happen server-side
+- **Client components** call `src/lib/ai-client.ts` helper functions (thin fetch wrappers)
+- These hit **API routes** at `src/app/api/*` which use the Supabase server client and Claude
+- The Anthropic API key is never exposed to the client — all AI calls happen server-side
 - Supabase clients: `src/lib/supabase/client.ts` (browser) and `src/lib/supabase/server.ts` (API routes/proxy)
 
 ### Key API Routes
@@ -99,7 +99,13 @@ Components in `src/components/live/` provide a full-screen timer overlay with au
 
 ### Security
 - All AI-calling API routes (`/api/generate-*`, `/api/weekly-analysis`, `/api/assessments/*`) must import and call `checkRateLimit` from `@/lib/rate-limit`
-- User-supplied text (sessionNotes, form inputs) must be sanitized before embedding in AI prompts: `.slice(0, 500).replace(/[<>{}]/g, '')` + delimiter wrapping
+- User-supplied text (session notes, chat messages, injury history, feedback notes, names, the client-sent WOD) must go through `sanitizeUserText` and be wrapped with `xmlBlock` from `@/lib/ai/prompt` before entering an AI prompt
+
+### AI prompts
+- Prompt builders live in `src/lib/ai/prompts/*`; routes only assemble data and call `generateStructured` / `openTextStream` from `@/lib/ai/claude`
+- System prompts go stable-to-variable: a base-instructions constant identical for every user first, then per-user context in XML tags. Never interpolate per-request values (dates, IDs) into the base block — it breaks prompt caching
+- Write instructions plainly with the reason behind them; no all-caps pressure words (`MUST`, `NUNCA`, `DIRECTIVA`). Output format is enforced by the Zod schema, not by prose
+- Each call logs an `ai_usage` JSON line (tokens, cache reads/writes) — check it in Vercel logs before changing caching or models
 - API route error responses must NEVER include `error.message` — log internally, return a generic Spanish message to the client
 - Auth callback (`/auth/callback`) must validate redirect paths and OTP types against allowlists
 - `next.config.ts` must include security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy

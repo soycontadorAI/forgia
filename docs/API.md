@@ -12,8 +12,8 @@ Forgia usa dos canales, igual que el cliente web:
    `personal_records`, `level_assessments`, `template_results`.
    Un cliente iOS debe usar [supabase-swift](https://github.com/supabase/supabase-swift)
    con las mismas políticas RLS; no hay endpoints REST propios para estas tablas.
-2. **API routes de Next.js** (este documento) — funciones con IA (Gemini) y
-   lógica de servidor. Son las únicas rutas que requieren la API key de Gemini
+2. **API routes de Next.js** (este documento) — funciones con IA (Claude) y
+   lógica de servidor. Son las únicas rutas que requieren la API key de Anthropic
    y por eso viven en el servidor.
 
 ## Autenticación

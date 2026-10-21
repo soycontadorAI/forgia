@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { WeeklyAnalysisData } from '@/types/weekly-analysis';
-import { fetchWeeklyAnalysis } from '@/lib/gemini';
+import { fetchWeeklyAnalysis } from '@/lib/ai-client';
 import Spinner from '@/components/Spinner';
 import { BarChart3, Trophy, AlertTriangle, Lightbulb, TrendingUp } from 'lucide-react';
 

@@ -59,7 +59,7 @@ export default function PrivacidadPage() {
         Para la prestación de nuestros servicios, sus datos pueden ser transferidos a los siguientes proveedores:
       </p>
       <ul className="list-disc list-inside space-y-2 mb-4 text-neutral-700 dark:text-neutral-300">
-        <li><strong>Google Gemini API:</strong> Datos de perfil y retroalimentación se envían de forma procesada para la generación de entrenamientos y análisis. Google puede procesar estos datos conforme a sus propias políticas de privacidad.</li>
+        <li><strong>Anthropic (API de Claude):</strong> Datos de perfil, retroalimentación y mensajes al Coach IA se envían de forma procesada para la generación de entrenamientos, análisis y respuestas. Anthropic puede procesar estos datos conforme a sus propias políticas de privacidad.</li>
         <li><strong>Supabase:</strong> Almacenamiento seguro de datos de cuenta, perfil, entrenamientos y retroalimentación. Gestión de autenticación de usuarios.</li>
       </ul>
 

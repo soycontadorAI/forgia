@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import type { Wod, WorkoutFeedback } from '@/types/wod';
 import type { LiveWorkoutResult } from '@/components/live/LiveWorkoutOverlay';
-import { generateWod } from '@/lib/gemini';
+import { generateWod } from '@/lib/ai-client';
 import { saveWod, getLatestWod, bulkInsertWods } from '@/lib/wods';
 import { useAuth } from '@/contexts/AuthContext';
 import Spinner from '@/components/Spinner';
