@@ -1,0 +1,254 @@
+/*
+ * Landing de Forgia (forgia.fit). Todo va bajo .lp para no tocar la app.
+ * Un teléfono fijo cambia de pantalla con el scroll: las animaciones usan
+ * scroll-driven animations (animation-timeline) como mejora progresiva; sin
+ * soporte, o con reduce motion, el contenido se ve completo y estático.
+ */
+.lp {
+  --ground: #0E0F12;
+  --surface: #17181D;
+  --raised: #1F2026;
+  --line: #2A2B32;
+  --fg: #F2F2F4;
+  --muted: #A3A4AE;
+  --ember: #EF4444;
+  --ember-deep: #DC2626;
+  --ember-hover: #B91C1C;
+  --ember-soft: #FCA5A5;
+  --flare: #F97316;
+  --flare-soft: #FDBA74;
+  --amber: #FBBF24;
+  --blue: #60A5FA;
+  --red: #F87171;
+  --green: #34D399;
+  --green-soft: #6EE7B7;
+  --on-ember: #FFFFFF;
+  --display: var(--font-space-grotesk), system-ui, sans-serif;
+  --body: var(--font-geist-sans), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: var(--font-geist-mono), ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  color-scheme: dark;
+}
+@property --glow { syntax: '<color>'; inherits: false; initial-value: rgba(239, 68, 68, 0.34); }
+@property --kg { syntax: '<integer>'; inherits: false; initial-value: 75; }
+@property --r { syntax: '<integer>'; inherits: false; initial-value: 4; }
+@property --ss { syntax: '<integer>'; inherits: false; initial-value: 522; }
+.lp { background: var(--ground); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.5; overflow-x: clip; }
+.lp a { color: inherit; }
+.lp :focus-visible { outline: 2px solid var(--flare); outline-offset: 3px; border-radius: 6px; }
+.lp h1, .lp h2, .lp h3 { text-wrap: balance; margin: 0; }
+.lp p { margin: 0; }
+.lp .wrap { max-width: 1160px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.lp .progress { display: none; }
+.lp .nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgba(14, 15, 18, 0.84); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+.lp .nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; }
+.lp .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--display); font-weight: 700; font-size: 19px; letter-spacing: -0.02em; }
+.lp .mark { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--ember), var(--flare)); display: grid; place-items: center; }
+.lp .nav-links { display: flex; align-items: center; gap: 4px; }
+.lp .nav-links a.link { font-size: 14px; color: var(--muted); text-decoration: none; padding: 10px 12px; border-radius: 10px; }
+.lp .nav-links a.link:hover { color: var(--fg); }
+.lp .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: 999px; font-family: var(--body); font-weight: 600; font-size: 15px; text-decoration: none; transition: background-color 0.2s, border-color 0.2s; }
+.lp .btn-primary { background: var(--ember-deep); color: var(--on-ember); }
+.lp .btn-primary:hover { background: var(--ember-hover); }
+.lp .btn-ghost { border: 1px solid var(--line); color: var(--fg); }
+.lp .btn-ghost:hover { border-color: var(--muted); }
+.lp .btn-sm { min-height: 40px; padding: 0 16px; font-size: 14px; }
+.lp .story { position: relative; view-timeline: --story block; }
+.lp .story-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; column-gap: clamp(32px, 7vw, 120px); }
+.lp .hero-copy { grid-column: 1; grid-row: 1; min-height: calc(100vh - 64px); display: flex; flex-direction: column; justify-content: center; gap: 24px; padding-block: 56px; }
+.lp .stage { grid-column: 2; grid-row: 1 / span 7; }
+.lp .stage-inner { position: sticky; top: max(80px, calc(50vh - 330px)); height: 660px; display: flex; justify-content: center; }
+.lp .step { grid-column: 1; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding-block: 56px; }
+.lp .step-inner { display: flex; flex-direction: column; gap: 16px; max-width: 32rem; }
+.lp .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ember-soft); }
+.lp .hero-copy h1 { font-family: var(--display); font-weight: 700; font-size: clamp(48px, 8vw, 104px); line-height: 0.94; letter-spacing: -0.045em; }
+.lp .hero-copy h1 em { font-style: normal; color: var(--ember); }
+.lp .lede { font-size: clamp(17px, 1.6vw, 20px); color: var(--muted); max-width: 34rem; }
+.lp .cta-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.lp .facts { display: flex; flex-wrap: wrap; gap: 8px 20px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.lp .facts span { display: inline-flex; align-items: center; gap: 8px; }
+.lp .facts span::before { content: ""; width: 6px; height: 6px; border-radius: 3px; background: var(--ember); }
+.lp .step h2 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 4.6vw, 56px); line-height: 1; letter-spacing: -0.035em; }
+.lp .step p { font-size: 18px; color: var(--muted); }
+.lp .step .tag-amber { color: var(--amber); }
+.lp .step .tag-blue { color: var(--blue); }
+.lp .step .tag-red { color: var(--red); }
+.lp .step .tag-flare { color: var(--flare-soft); }
+.lp .step .tag-green { color: var(--green); }
+.lp .detail { display: flex; flex-wrap: wrap; gap: 8px; }
+.lp .detail span { font-family: var(--mono); font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--fg); }
+.lp .glow { position: absolute; inset: 40px -140px; z-index: -1; background: radial-gradient(closest-side, var(--glow), transparent 75%); filter: blur(24px); pointer-events: none; }
+.lp .phone { position: relative; width: 320px; height: 660px; box-sizing: border-box; padding: 10px; border-radius: 48px; background: #050506; box-shadow: 0 0 0 1px var(--line), 0 50px 100px rgba(0, 0, 0, 0.55); }
+.lp .screen { position: relative; width: 100%; height: 100%; border-radius: 38px; overflow: hidden; background: var(--ground); }
+.lp .scr { position: absolute; inset: 0; box-sizing: border-box; padding: 26px 14px 16px; display: flex; flex-direction: column; gap: 10px; opacity: 0; pointer-events: none; font-size: 13px; }
+.lp .s0 { opacity: 1; }
+.lp .ph-head { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; }
+.lp .ph-dim { font-size: 11px; color: var(--muted); }
+.lp .ph-h { font-family: var(--display); font-weight: 600; font-size: 19px; letter-spacing: -0.02em; }
+.lp .ph-av { width: 36px; height: 36px; border-radius: 18px; background: linear-gradient(135deg, var(--ember), var(--flare)); color: var(--ground); font-family: var(--display); font-weight: 700; font-size: 12px; display: grid; place-items: center; }
+.lp .ph-card { background: var(--surface); border-radius: 22px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.lp .ph-title { font-family: var(--display); font-weight: 700; font-size: 24px; letter-spacing: -0.03em; line-height: 1.05; }
+.lp .ph-bar { display: flex; gap: 3px; height: 7px; }
+.lp .ph-bar i { border-radius: 4px; }
+.lp .ph-row { display: flex; align-items: center; gap: 10px; min-height: 34px; border-bottom: 1px solid var(--raised); }
+.lp .ph-row:last-child { border-bottom: 0; }
+.lp .ph-row .dot { width: 7px; height: 7px; border-radius: 4px; flex-shrink: 0; }
+.lp .ph-row .grow { flex: 1; }
+.lp .ph-row .val { color: var(--muted); font-size: 12px; }
+.lp .ph-cta { height: 46px; border-radius: 16px; background: var(--ember-deep); color: var(--on-ember); display: grid; place-items: center; font-family: var(--display); font-weight: 600; font-size: 15px; }
+.lp .mono { font-family: var(--mono); }
+.lp .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lp .chip { font-size: 12px; padding: 7px 11px; border-radius: 999px; background: var(--raised); border: 1px solid var(--line); }
+.lp .chip.warn { border-color: #5A2A2D; color: var(--ember-soft); }
+.lp .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--muted); }
+.lp .legend span { display: inline-flex; align-items: center; gap: 5px; }
+.lp .legend i { width: 7px; height: 7px; border-radius: 4px; }
+.lp .big-kg { font-family: var(--display); font-weight: 700; font-size: 72px; line-height: 1; letter-spacing: -0.05em; }
+.lp .big-kg small { font-size: 22px; color: var(--muted); letter-spacing: 0; }
+.lp .pcts { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.lp .pcts span { height: 34px; border-radius: 10px; background: var(--raised); display: grid; place-items: center; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.lp .pcts span.on { background: var(--ember-deep); color: var(--on-ember); }
+.lp .clock-wrap { position: relative; height: 230px; display: grid; place-items: center; }
+.lp .clock-wrap svg { position: absolute; inset: 0; margin: auto; }
+.lp .clock { font-family: var(--display); font-weight: 700; font-size: 56px; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.lp .stats3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.lp .stats3 div { background: var(--surface); border-radius: 14px; padding: 9px 10px; display: flex; flex-direction: column; }
+.lp .stats3 b { font-family: var(--display); font-size: 20px; font-weight: 700; }
+.lp .stats3 span { font-size: 10px; color: var(--muted); }
+.lp .bubbles { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.lp .bubble { max-width: 84%; padding: 10px 12px; border-radius: 16px; font-size: 12.5px; line-height: 1.4; }
+.lp .bubble.me { align-self: flex-end; background: var(--ember-deep); color: var(--on-ember); border-bottom-right-radius: 4px; }
+.lp .bubble.coach { align-self: flex-start; background: var(--surface); border-bottom-left-radius: 4px; }
+.lp .coach-tag { display: flex; align-items: center; gap: 8px; padding: 0 4px; font-weight: 600; font-size: 14px; }
+.lp .sheet { position: relative; z-index: 2; background: var(--surface); border-radius: 40px 40px 0 0; margin-top: -6vh; padding-block: clamp(64px, 9vw, 120px) 40px; transform-origin: 50% 0; }
+.lp .section-head { display: flex; flex-direction: column; gap: 14px; max-width: 40rem; }
+.lp .section-head h2 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 4.6vw, 56px); line-height: 1; letter-spacing: -0.035em; }
+.lp .section-head p { font-size: 18px; color: var(--muted); }
+.lp .rails { margin-top: 40px; display: flex; flex-direction: column; gap: 12px; overflow: clip; }
+.lp .rail { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; padding: 0; margin: 0; list-style: none; }
+.lp .rail-b { display: none; }
+.lp .wod { flex-shrink: 0; width: 230px; box-sizing: border-box; padding: 16px 18px; border-radius: 20px; background: var(--raised); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.lp .wod b { font-family: var(--display); font-size: 24px; letter-spacing: -0.02em; }
+.lp .wod span { font-size: 13px; color: var(--muted); }
+.lp .where { margin-top: clamp(80px, 10vw, 140px); }
+.lp .where-grid { margin-top: 32px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.lp .where-card { background: var(--raised); border-radius: 24px; padding: 22px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.lp .where-card h3 { font-family: var(--display); font-weight: 600; font-size: 20px; letter-spacing: -0.02em; }
+.lp .where-card p { font-size: 15px; color: var(--muted); }
+.lp .where-card .ico { width: 40px; height: 40px; border-radius: 12px; background: var(--surface); display: grid; place-items: center; color: var(--ember-soft); }
+.lp .levels { margin-top: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+.lp .levels .lv { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--fg); font-family: var(--mono); font-size: 13px; }
+.lp .levels .lv.hy { border-color: #5A3A1E; color: var(--flare-soft); }
+.lp .final { position: relative; margin-top: clamp(96px, 12vw, 160px); padding-block: clamp(72px, 10vw, 128px); text-align: center; overflow: clip; border-radius: 40px; background: var(--ground); }
+.lp .final .ember-orb { position: absolute; left: 50%; top: 50%; width: 760px; height: 760px; margin: -380px 0 0 -380px; border-radius: 50%; background: radial-gradient(closest-side, rgba(239, 68, 68, 0.42), rgba(249, 115, 22, 0.16) 55%, transparent 75%); pointer-events: none; }
+.lp .final-inner { position: relative; display: flex; flex-direction: column; align-items: center; gap: 18px; padding-inline: 16px; }
+.lp .final h2 { font-family: var(--display); font-weight: 700; font-size: clamp(48px, 8vw, 104px); line-height: 0.94; letter-spacing: -0.045em; }
+.lp .final p { font-size: 18px; color: var(--muted); max-width: 30rem; }
+.lp .final small { font-size: 13px; color: var(--muted); }
+.lp footer { padding-block: 40px 48px; font-size: 13px; color: var(--muted); }
+.lp footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
+.lp footer nav { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.lp footer a { text-decoration: none; color: var(--muted); }
+.lp footer a:hover { color: var(--fg); }
+@media (max-width: 880px) {
+  .lp .nav-links a.link { display: none; }
+  .lp .story-grid { display: block; }
+  .lp .hero-copy { min-height: 0; padding-block: 40px 28px; }
+  .lp .stage { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 64px); z-index: 1; height: 384px; background: linear-gradient(var(--ground) 88%, transparent); }
+  .lp .stage-inner { position: static; height: 384px; }
+  .lp .phone { transform: scale(0.56); transform-origin: 50% 8px; }
+  .lp .glow { inset: 0 -60px 260px; }
+  .lp .step { min-height: 78vh; justify-content: flex-start; padding-block: 24px 40px; }
+  .lp .where-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lp .sheet { margin-top: 0; border-radius: 28px 28px 0 0; }
+}
+@media (max-width: 520px) {
+  .lp .where-grid { grid-template-columns: minmax(0, 1fr); }
+  .lp .hero-copy h1 { font-size: 52px; }
+}
+@supports (animation-timeline: view()) {
+  .lp .progress { display: block; position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; height: 2px; z-index: 40; background: linear-gradient(90deg, var(--ember), var(--flare)); transform-origin: 0 50%; animation: grow linear both; animation-timeline: scroll(root); }
+  @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  .lp .scr { animation-timing-function: linear; animation-fill-mode: both; animation-timeline: --story; animation-range: contain 0% contain 100%; }
+  .lp .s0 { animation-name: scr0; }
+  .lp .s1 { animation-name: scr1; }
+  .lp .s2 { animation-name: scr2; }
+  .lp .s3 { animation-name: scr3; }
+  .lp .s4 { animation-name: scr4; }
+  .lp .s5 { animation-name: scr5; }
+  .lp .s6 { animation-name: scr6; }
+  @keyframes scr0 { 0%, 6% { opacity: 1; } 10%, 100% { opacity: 0; } }
+  @keyframes scr1 { 0%, 6% { opacity: 0; } 10%, 23% { opacity: 1; } 27%, 100% { opacity: 0; } }
+  @keyframes scr2 { 0%, 23% { opacity: 0; } 27%, 39% { opacity: 1; } 44%, 100% { opacity: 0; } }
+  @keyframes scr3 { 0%, 39% { opacity: 0; } 44%, 56% { opacity: 1; } 61%, 100% { opacity: 0; } }
+  @keyframes scr4 { 0%, 56% { opacity: 0; } 61%, 73% { opacity: 1; } 77%, 100% { opacity: 0; } }
+  @keyframes scr5 { 0%, 73% { opacity: 0; } 77%, 89% { opacity: 1; } 94%, 100% { opacity: 0; } }
+  @keyframes scr6 { 0%, 89% { opacity: 0; } 94%, 100% { opacity: 1; } }
+  .lp .glow { animation: glowShift linear both; animation-timeline: --story; animation-range: contain 0% contain 100%; }
+  @keyframes glowShift {
+    0%, 8% { --glow: rgba(239, 68, 68, 0.34); }
+    25% { --glow: rgba(251, 191, 36, 0.24); }
+    41% { --glow: rgba(96, 165, 250, 0.26); }
+    58% { --glow: rgba(96, 165, 250, 0.26); }
+    75% { --glow: rgba(248, 113, 113, 0.32); }
+    90% { --glow: rgba(249, 115, 22, 0.28); }
+    100% { --glow: rgba(52, 211, 153, 0.24); }
+  }
+  .lp .num-static { display: none; }
+  .lp .kg::before { counter-reset: kg var(--kg); content: counter(kg); }
+  .lp .kg { animation: kgDrop linear both; animation-timeline: --story; animation-range: contain 42% contain 53%; }
+  @keyframes kgDrop { from { --kg: 100; } to { --kg: 75; } }
+  .lp .rounds::before { counter-reset: r var(--r); content: counter(r); }
+  .lp .rounds { animation: roundsUp linear both; animation-timeline: --story; animation-range: contain 58% contain 74%; }
+  @keyframes roundsUp { from { --r: 1; } to { --r: 5; } }
+  .lp .clock::before { counter-reset: mm round(down, var(--ss) / 60, 1) ss mod(var(--ss), 60); content: counter(mm) ":" counter(ss, decimal-leading-zero); }
+  .lp .clock { animation: clockRun linear both; animation-timeline: --story; animation-range: contain 58% contain 74%; }
+  @keyframes clockRun { from { --ss: 780; } to { --ss: 480; } }
+  .lp .arc { animation: arcRun linear both; animation-timeline: --story; animation-range: contain 58% contain 74%; }
+  @keyframes arcRun { from { stroke-dashoffset: 90; } to { stroke-dashoffset: 300; } }
+  .lp .ring-seg { animation: ringDraw linear both; animation-timeline: --story; animation-range: contain 25% contain 37%; }
+  @keyframes ringDraw { from { stroke-dasharray: 0 213.6; } }
+  .lp .curve { animation: curveDraw linear both; animation-timeline: --story; animation-range: contain 90% contain 99%; }
+  @keyframes curveDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  .lp .rail { flex-wrap: nowrap; justify-content: flex-start; width: max-content; }
+  .lp .rail-b { display: flex; }
+  @media (prefers-reduced-motion: no-preference) {
+    .lp .hero-copy { animation: heroOut linear both; animation-timeline: view(); animation-range: exit 0% exit 75%; }
+    @keyframes heroOut { to { opacity: 0; transform: translateY(-72px); } }
+    .lp .step-inner { animation: stepIn linear both, stepOut linear both; animation-timeline: view(), view(); animation-range: entry 15% cover 42%, cover 62% exit 90%; }
+    @keyframes stepIn { from { opacity: 0; transform: translateY(56px); } }
+    @keyframes stepOut { to { opacity: 0; transform: translateY(-56px); } }
+    .lp .s1 .chip { animation: chipIn linear both; animation-timeline: --story; }
+    .lp .s1 .chip:nth-child(1) { animation-range: contain 6% contain 12%; }
+    .lp .s1 .chip:nth-child(2) { animation-range: contain 8% contain 14%; }
+    .lp .s1 .chip:nth-child(3) { animation-range: contain 10% contain 16%; }
+    .lp .s1 .chip:nth-child(4) { animation-range: contain 12% contain 18%; }
+    .lp .s1 .chip:nth-child(5) { animation-range: contain 14% contain 20%; }
+    .lp .s1 .chip:nth-child(6) { animation-range: contain 16% contain 22%; }
+    @keyframes chipIn { from { opacity: 0; transform: translateX(-40px) scale(0.9); } }
+    .lp .s5 .bubble { animation: bubbleIn linear both; animation-timeline: --story; }
+    .lp .s5 .bubble:nth-child(1) { animation-range: contain 74% contain 77%; }
+    .lp .s5 .bubble:nth-child(2) { animation-range: contain 77% contain 81%; }
+    .lp .s5 .bubble:nth-child(3) { animation-range: contain 81% contain 84%; }
+    .lp .s5 .bubble:nth-child(4) { animation-range: contain 84% contain 88%; }
+    @keyframes bubbleIn { from { opacity: 0; transform: translateY(16px) scale(0.96); } }
+    .lp .sheet { animation: sheetRise linear both; animation-timeline: view(); animation-range: entry 0% entry 70%; }
+    @keyframes sheetRise { from { transform: scale(0.93); border-radius: 72px 72px 0 0; } }
+    .lp .rail-a { animation: railLeft linear both; animation-timeline: view(); animation-range: cover 0% cover 100%; }
+    .lp .rail-b { animation: railRight linear both; animation-timeline: view(); animation-range: cover 0% cover 100%; }
+    @keyframes railLeft { from { transform: translateX(0); } to { transform: translateX(-38%); } }
+    @keyframes railRight { from { transform: translateX(-38%); } to { transform: translateX(0); } }
+    .lp .where-card { animation: cardUp linear both; animation-timeline: view(); }
+    .lp .where-card:nth-child(1) { animation-range: entry 0% entry 70%; }
+    .lp .where-card:nth-child(2) { animation-range: entry 10% entry 80%; }
+    .lp .where-card:nth-child(3) { animation-range: entry 20% entry 90%; }
+    .lp .where-card:nth-child(4) { animation-range: entry 30% entry 100%; }
+    @keyframes cardUp { from { opacity: 0; transform: translateY(64px); } }
+    .lp .ember-orb { animation: orb linear both; animation-timeline: view(); animation-range: entry 0% cover 55%; }
+    @keyframes orb { from { transform: scale(0.35); opacity: 0.2; } }
+    .lp .final h2 { animation: forgeIn linear both; animation-timeline: view(); animation-range: entry 20% cover 45%; }
+    @keyframes forgeIn { from { letter-spacing: 0.06em; opacity: 0; filter: blur(8px); } }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+
+}
