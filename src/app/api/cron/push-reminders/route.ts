@@ -4,8 +4,8 @@ import webpush from 'web-push';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 // Lo llama pg_cron cada hora (ver la migración push_reminders) con
-// `Authorization: Bearer <CRON_SECRET>`. Avisa a quien hoy no ha registrado
-// un resultado y todavía no cumple su meta semanal.
+// `Authorization: Bearer <CRON_SECRET>`. Cada suscripción recibe a lo más un
+// aviso al día, a su hora local, si hoy no ha registrado un resultado.
 
 interface DueReminder {
   id: string;
@@ -27,14 +27,17 @@ function isAuthorized(request: NextRequest): boolean {
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
+function reminderBody(r: DueReminder): string {
+  const missing = r.goal - r.days_this_week;
+  if (r.days_this_week === 0) return `Tu meta es de ${r.goal} días esta semana. Hoy es buen día para empezar.`;
+  if (missing > 0) return `Llevas ${r.days_this_week} de ${r.goal} días esta semana. Te ${missing === 1 ? 'falta 1' : `faltan ${missing}`}.`;
+  return `Ya llevas ${r.days_this_week} días esta semana. Si hoy toca, tu WOD te espera.`;
+}
+
 function reminderMessage(r: DueReminder) {
-  const missing = Math.max(1, r.goal - r.days_this_week);
   return {
     title: 'Hoy no has entrenado',
-    body:
-      r.days_this_week === 0
-        ? `Tu meta es de ${r.goal} días esta semana. Hoy es buen día para empezar.`
-        : `Llevas ${r.days_this_week} de ${r.goal} días esta semana. Te ${missing === 1 ? 'falta 1' : `faltan ${missing}`}.`,
+    body: reminderBody(r),
     url: '/app',
     tag: `reminder-${r.local_date}`,
   };

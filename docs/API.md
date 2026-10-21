@@ -270,8 +270,8 @@ dispara cada hora (job `push-reminders`, Vercel Hobby sólo permite un cron
 diario) con `Authorization: Bearer <CRON_SECRET>`; sin ese header → `401`.
 
 Lee `due_push_reminders()` (service role): suscripciones cuya hora local es
-`reminder_hour`, sin resultado registrado hoy en su zona, sin aviso enviado hoy
-y por debajo de su meta semanal. Envía con `web-push`, marca `last_sent_on` y
+`reminder_hour`, sin resultado registrado hoy en su zona y sin aviso enviado
+hoy. A lo más un aviso al día por suscripción. Envía con `web-push`, marca `last_sent_on` y
 borra las suscripciones que el servicio de push da por vencidas (404/410).
 
 **200**: `{ "due": n, "sent": n, "expired": n }`.
