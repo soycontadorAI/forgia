@@ -125,7 +125,8 @@ export function useTimer({ config, onTick, onRoundChange, onFinish }: UseTimerOp
     const newState = computeState(elapsedMs);
 
     // Fire onTick only on second boundaries
-    if (newState.elapsedSeconds !== prevSecondRef.current) {
+    const secondChanged = newState.elapsedSeconds !== prevSecondRef.current;
+    if (secondChanged) {
       prevSecondRef.current = newState.elapsedSeconds;
       onTickRef.current?.(newState);
     }
@@ -143,7 +144,9 @@ export function useTimer({ config, onTick, onRoundChange, onFinish }: UseTimerOp
       return; // stop the loop
     }
 
-    setState(newState);
+    // Todo el estado se deriva de los segundos enteros: re-renderizar en cada
+    // frame (60 veces por segundo) solo gasta batería durante el entrenamiento
+    if (secondChanged) setState(newState);
     rafIdRef.current = requestAnimationFrame(tick);
   }, [computeState]);
 
@@ -151,6 +154,8 @@ export function useTimer({ config, onTick, onRoundChange, onFinish }: UseTimerOp
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && startTimestampRef.current && !finishedRef.current) {
+        // tick() agenda su propio frame: cancelar el pendiente evita dos loops en paralelo
+        if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
         tick();
       }
     };
