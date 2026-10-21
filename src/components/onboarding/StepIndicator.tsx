@@ -1,30 +1,46 @@
 'use client';
 
-import { ArrowLeft } from 'lucide-react';
+import { cx } from '@/lib/cx';
+
+const STEP_NAMES = ['Sobre ti', 'Objetivos', 'Equipamiento', 'Frecuencia'];
 
 interface StepIndicatorProps {
   currentStep: number;
   totalSteps?: number;
-  onBack?: () => void;
 }
 
-export default function StepIndicator({ currentStep, totalSteps = 4, onBack }: StepIndicatorProps) {
+export default function StepIndicator({ currentStep, totalSteps = 4 }: StepIndicatorProps) {
+  const steps = Array.from({ length: totalSteps }, (_, i) => i + 1);
+  const currentName = STEP_NAMES[currentStep - 1];
+
   return (
-    <div className="flex items-center justify-between mb-6">
-      {currentStep > 1 ? (
-        <button
-          type="button"
-          onClick={onBack}
-          className="p-2 -ml-2 rounded-lg text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-      ) : (
-        <div />
-      )}
-      <span className="text-sm font-medium text-neutral-400 dark:text-neutral-500">
-        {currentStep} de {totalSteps}
-      </span>
+    <div className="mb-6 flex flex-col gap-3">
+      {/* Se anuncia al cambiar de paso */}
+      <p aria-live="polite" className="font-mono text-xs tracking-wider text-muted uppercase">
+        Paso {currentStep} de {totalSteps}
+        {currentName && <span className="text-fg"> · {currentName}</span>}
+      </p>
+      <ol aria-label="Progreso del registro" className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${totalSteps}, minmax(0, 1fr))` }}>
+        {steps.map((step) => {
+          const done = step < currentStep;
+          const current = step === currentStep;
+          return (
+            <li key={step} aria-current={current ? 'step' : undefined}>
+              <span
+                aria-hidden="true"
+                className={cx(
+                  'block h-1.5 rounded-full transition-colors',
+                  current ? 'bg-accent-solid' : done ? 'bg-fg' : 'bg-raised'
+                )}
+              />
+              <span className="sr-only">
+                Paso {step} de {totalSteps}: {STEP_NAMES[step - 1] ?? ''}
+                {done ? ' (completado)' : ''}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
