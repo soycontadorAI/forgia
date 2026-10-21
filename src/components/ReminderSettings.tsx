@@ -76,7 +76,7 @@ export default function ReminderSettings() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted">
-        Si a tu hora no has registrado un entrenamiento y todavía no cumples tu meta de la semana, te llega un aviso. Sólo uno al día.
+        Si a tu hora no has registrado un entrenamiento, te llega un aviso. Sólo uno al día.
       </p>
 
       {status === 'needs-install' && (
