@@ -157,7 +157,7 @@ export default function LevelAssessmentCard() {
 
               {showWod && (
                 <div id={wodPanelId} className="border-t border-line pt-3">
-                  <WodDisplay wod={benchmark.wod} />
+                  <WodDisplay wod={benchmark.wod} date={null} />
                 </div>
               )}
 

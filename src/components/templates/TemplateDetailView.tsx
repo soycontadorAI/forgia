@@ -175,7 +175,7 @@ export default function TemplateDetailView({ template }: TemplateDetailViewProps
           </Button>
         </div>
 
-        <WodDisplay wod={template.wod} />
+        <WodDisplay wod={template.wod} date={null} />
 
         <section aria-labelledby="historial-titulo" className="flex flex-col gap-3">
           <h2 id="historial-titulo" className="font-display text-xl font-semibold tracking-tight">
