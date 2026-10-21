@@ -246,11 +246,11 @@ export default function AppPage() {
 
       {/* Floating Action Bar */}
       {wod && !showLiveMode && (
-        <div data-print-hide className="fixed bottom-0 left-0 right-0 z-40">
+        <div data-print-hide className="fixed bottom-(--tabbar-h) left-0 right-0 z-40">
           {/* Gradient fade */}
-          <div className="h-8 bg-linear-to-t from-white dark:from-[#0a0a0a] to-transparent" />
+          <div className="h-8 bg-linear-to-t from-ground to-transparent" />
           {/* Action bar */}
-          <div className="bg-white dark:bg-[#0a0a0a] border-t border-neutral-200 dark:border-neutral-800 px-[max(1rem,env(safe-area-inset-left,1rem))] pb-[env(safe-area-inset-bottom,0px)]">
+          <div className="bg-ground border-t border-line px-[max(1rem,env(safe-area-inset-left,1rem))] sm:pb-[env(safe-area-inset-bottom,0px)]">
             <div className="container mx-auto max-w-4xl flex items-center justify-between py-3">
               {/* Left: utility buttons */}
               <div className="flex items-center gap-2">

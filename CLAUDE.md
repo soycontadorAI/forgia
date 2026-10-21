@@ -88,9 +88,16 @@ Components in `src/components/live/` provide a full-screen timer overlay with au
 
 - **Spanish UI**: All user-facing strings, error messages, and Supabase auth error translations are in Spanish
 - **CrossFit terminology** stays in English where standard (WOD, AMRAP, EMOM, Rx, Scaled, 1RM, PR, Metcon)
-- **Brand color**: Red-500 `#EF4444` is the primary accent; gradient is `#EF4444 → #F97316`
-- **WOD section colors**: warmUp=amber, strengthSkill=blue, metcon=red, coolDown=emerald
-- **Fonts**: Geist Sans (UI) and Geist Mono (timers/numbers), loaded via `next/font/google`
+- **Brand color**: Red-500 `#EF4444` is the primary accent; gradient is `#EF4444 → #F97316`. Solid buttons with white text use `accent-solid` (`#DC2626`) for AA contrast
+- **WOD section colors**: warmUp=amber, strengthSkill=blue, metcon=red, coolDown=emerald (tokens `warmup`, `strength`, `metcon`, `cooldown`)
+- **Fonts**: Space Grotesk (`font-display`, titles and big numbers), Geist Sans (UI) and Geist Mono (timers/numbers), loaded via `next/font/google`
+
+### Design system ("Pulso")
+- Tokens live in `src/app/globals.css`. New code uses the semantic ones (`bg-ground`, `bg-surface`, `bg-raised`, `border-line`, `text-fg`, `text-muted`, `text-accent`, `bg-accent-solid`, `bg-accent-soft`) instead of `neutral-*` + `dark:` pairs; they switch with the theme on their own. The Tailwind `neutral` scale is re-tinted to the same cool grays so older classes still match
+- Reuse the primitives in `src/components/ui/`: `Button`/`ButtonLink`/`IconButton`, `Card`/`Eyebrow`, `TextField`/`TextAreaField`/`SelectField`, `Dialog`/`ConfirmDialog` (native `<dialog>`, use for every modal and for confirming destructive actions), `SegmentedButton` (options) and `TabLinks` (sub-route tabs). Combine classes with `cx` from `@/lib/cx`
+- Navigation: `NAV_ITEMS` in `src/components/nav/nav-items.ts` feeds both the mobile `BottomTabBar` and the desktop header. Anything fixed to the bottom of the screen sits at `bottom-(--tabbar-h)` so it clears the tab bar on mobile
+- Progreso groups `/app/progreso` (resumen), `/historia`, `/records` and `/programa`; the old `/app/historia|records|programa` URLs redirect there (`next.config.ts`)
+- A global `:focus-visible` outline and a `prefers-reduced-motion` reset live in `globals.css`; don't remove focus styles in components
 - **Icons**: Lucide React exclusively
 - Client components use `'use client'` directive
 - Brand guidelines are in `docs/BRAND_GUIDELINES.md`

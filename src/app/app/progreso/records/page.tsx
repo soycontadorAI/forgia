@@ -160,9 +160,9 @@ export default function RecordsPage() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">
+          <h2 className="text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">
             Records Personales
-          </h1>
+          </h2>
           <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1">
             Lleva el registro de tus PRs y calcula tu RM.
           </p>

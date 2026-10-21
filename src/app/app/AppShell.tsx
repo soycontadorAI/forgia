@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ChatProvider } from '@/contexts/ChatContext';
 import AppHeader from '@/components/AppHeader';
 import AppFooter from '@/components/AppFooter';
+import BottomTabBar from '@/components/nav/BottomTabBar';
 import OnboardingGuard from '@/components/onboarding/OnboardingGuard';
 import OpenBanner from '@/components/open/OpenBanner';
 
@@ -14,15 +15,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <ChatProvider>
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col pb-(--tabbar-h)">
           <OpenBanner />
           <AppHeader />
-          <main className="container mx-auto px-4 py-8 max-w-4xl grow overflow-x-hidden">
+          <main className="container mx-auto px-4 py-6 sm:py-8 max-w-4xl grow overflow-x-hidden">
             <OnboardingGuard>
               {children}
             </OnboardingGuard>
           </main>
           <AppFooter />
+          <BottomTabBar />
           <ChatAssistant />
         </div>
       </ChatProvider>
