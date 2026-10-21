@@ -17,10 +17,6 @@ final class SessionStore {
 
     let client = SupabaseClient(supabaseURL: AppConfig.supabaseURL, supabaseKey: AppConfig.supabaseAnonKey)
 
-    /// Al crear la cuenta se aceptan los términos, pero sin correo confirmado no
-    /// hay sesión para guardarlo; se guarda en el primer inicio de sesión.
-    private let pendingTermsKey = "forgia.pendingTermsAcceptedAt"
-
     init() {
         Task { await listen() }
     }
@@ -30,7 +26,6 @@ final class SessionStore {
             if let session, !session.isExpired {
                 state = .signedIn(userID: session.user.id, email: session.user.email)
                 await refreshProfile()
-                await savePendingTerms()
             } else {
                 state = .signedOut
                 profile = nil
@@ -47,11 +42,12 @@ final class SessionStore {
         try await client.auth.signIn(email: email, password: password)
     }
 
+    /// El trigger handle_new_user guarda terms_accepted_at con la hora del servidor.
     func signUp(email: String, password: String) async throws {
-        UserDefaults.standard.set(Date(), forKey: pendingTermsKey)
         try await client.auth.signUp(
             email: email,
             password: password,
+            data: ["terms_accepted": .bool(true)],
             redirectTo: AppConfig.webURL.appending(path: "auth/callback")
         )
     }
@@ -89,15 +85,6 @@ final class SessionStore {
         await refreshProfile()
     }
 
-    private func savePendingTerms() async {
-        guard let acceptedAt = UserDefaults.standard.object(forKey: pendingTermsKey) as? Date,
-              let userID, profile?.termsAcceptedAt == nil else { return }
-        _ = try? await client.from("profiles")
-            .update(["terms_accepted_at": acceptedAt])
-            .eq("id", value: userID)
-            .execute()
-        UserDefaults.standard.removeObject(forKey: pendingTermsKey)
-    }
 }
 
 /// `ai_consent_at` se manda aunque sea nil: así se retira el permiso.

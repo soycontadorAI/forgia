@@ -6,7 +6,7 @@ tablas (con RLS) y las rutas `https://forgia.fit/api/*` con
 
 ## Qué hay
 
-- Inicio de sesión y creación de cuenta (los términos se guardan en el primer inicio)
+- Inicio de sesión y creación de cuenta (la aceptación de términos va en los metadatos del registro)
 - Hoy: generar el WOD con nota opcional, ver el último WOD del día y guardarlo en `wods`
 - Permiso de IA antes de cualquier generación (App Store 5.1.2(i)), igual que la web
 - Cuenta: permiso de IA, cerrar sesión y eliminar la cuenta (App Store 5.1.1(v))
