@@ -1,9 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
+import confetti from 'canvas-confetti';
+import { Trophy } from 'lucide-react';
 import type { ExperienceLevel } from '@/types/profile';
+import { Dialog } from '@/components/ui/Dialog';
+import { Button } from '@/components/ui/Button';
 
 interface LevelUpCelebrationProps {
+  open: boolean;
   newLevel: ExperienceLevel;
   onClose: () => void;
 }
@@ -14,83 +19,42 @@ const LEVEL_MESSAGES: Record<string, string> = {
   Avanzado: 'Eres un atleta de elite. Dominas los movimientos olímpicos y la gimnasia avanzada.',
 };
 
-export default function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProps) {
-  const [visible, setVisible] = useState(false);
+const CONFETTI_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#10b981', '#3b82f6'];
 
+export default function LevelUpCelebration({ open, newLevel, onClose }: LevelUpCelebrationProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // El confeti se dibuja en un canvas dentro del <dialog>: el modal vive en la
+  // capa superior y taparía un canvas a pantalla completa en el body.
   useEffect(() => {
-    requestAnimationFrame(() => setVisible(true));
-  }, []);
-
-  const handleClose = () => {
-    setVisible(false);
-    setTimeout(onClose, 300);
-  };
+    if (!open || !canvasRef.current) return;
+    const shoot = confetti.create(canvasRef.current, { resize: true, disableForReducedMotion: true });
+    const frame = requestAnimationFrame(() => {
+      shoot({ particleCount: 70, spread: 75, startVelocity: 35, origin: { x: 0.5, y: 0.35 }, colors: CONFETTI_COLORS });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      shoot.reset();
+    };
+  }, [open]);
 
   return (
-    <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-300 ${
-        visible ? 'opacity-100' : 'opacity-0'
-      }`}
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
-
-      {/* Confetti particles (CSS-only) */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {Array.from({ length: 20 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute animate-confetti"
-            style={{
-              left: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 2}s`,
-              animationDuration: `${2 + Math.random() * 2}s`,
-              backgroundColor: ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'][i % 5],
-              width: `${6 + Math.random() * 6}px`,
-              height: `${6 + Math.random() * 6}px`,
-              borderRadius: Math.random() > 0.5 ? '50%' : '2px',
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Card */}
-      <div
-        className={`relative bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-700 shadow-2xl max-w-sm w-full p-8 text-center transition-transform duration-300 ${
-          visible ? 'scale-100' : 'scale-90'
-        }`}
-      >
-        {/* Trophy */}
-        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
-            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
-            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
-            <path d="M4 22h16"/>
-            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
-            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
-            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
-          </svg>
+    <Dialog open={open} onClose={onClose} title="Nivel alcanzado" className="sm:max-w-sm">
+      <div className="flex flex-col items-center gap-4 pb-2 text-center">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warmup/12">
+          <Trophy className="h-10 w-10 text-warmup" aria-hidden="true" />
         </div>
-
-        <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
-          Nivel Alcanzado
-        </h2>
-
-        <div className="inline-block px-4 py-1.5 mb-4 rounded-full bg-red-500 text-white font-bold text-lg">
+        <p className="rounded-full bg-accent-solid px-5 py-1.5 font-display text-xl font-bold text-on-accent">
           {newLevel}
-        </div>
-
-        <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-8 leading-relaxed">
+        </p>
+        <p className="text-[15px] leading-relaxed text-muted">
           {LEVEL_MESSAGES[newLevel] || 'Has alcanzado un nuevo nivel. Sigue entrenando duro.'}
         </p>
-
-        <button
-          onClick={handleClose}
-          className="w-full py-3 text-sm font-bold uppercase tracking-wider text-white bg-red-500 rounded-xl hover:bg-red-600 shadow-lg shadow-red-500/25 transition-all duration-200"
-        >
+        <Button fullWidth size="lg" onClick={onClose} className="mt-2">
           Continuar
-        </button>
+        </Button>
       </div>
-    </div>
+      <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" />
+    </Dialog>
   );
 }

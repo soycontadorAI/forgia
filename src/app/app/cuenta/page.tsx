@@ -1,181 +1,207 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useId, type FormEvent, type ReactNode } from 'react';
 import { toast } from 'sonner';
+import { AlertCircle, Calendar, Loader2, LogOut, Mail, Save, Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateDisplayName } from '@/lib/profiles';
-import {
-  User,
-  Mail,
-  Calendar,
-  CreditCard,
-  Zap,
-  Save,
-  Loader2,
-} from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { TextField } from '@/components/ui/Field';
+import { ConfirmDialog } from '@/components/ui/Dialog';
 
 function formatDate(isoString: string | null): string {
   if (!isoString) return 'No disponible';
   return new Intl.DateTimeFormat('es-MX', { dateStyle: 'long' }).format(new Date(isoString));
 }
 
+function AccountSection({ title, children }: { title: string; children: ReactNode }) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId}>
+      <Card className="flex flex-col gap-5 sm:p-6">
+        <h2 id={headingId} className="font-display text-lg font-semibold tracking-tight">
+          {title}
+        </h2>
+        {children}
+      </Card>
+    </section>
+  );
+}
+
 export default function CuentaPage() {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
 
-  const [displayName, setDisplayName] = useState('');
+  const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const deleteNoteId = useId();
 
-  useEffect(() => {
-    if (profile) {
-      setDisplayName(profile.display_name || '');
-    }
-  }, [profile]);
+  // Cuando llega (o se refresca) el perfil, el campo vuelve al nombre guardado
+  const [syncedProfile, setSyncedProfile] = useState(profile);
+  if (profile !== syncedProfile) {
+    setSyncedProfile(profile);
+    if (profile) setDisplayName(profile.display_name || '');
+  }
 
   const hasChanges = displayName.trim() !== (profile?.display_name || '');
   const isValid = displayName.trim().length > 0;
 
-  const handleSave = async () => {
-    if (!user || !isValid || !hasChanges) return;
+  const handleSave = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!user || !isValid || !hasChanges || isSaving) return;
 
     setIsSaving(true);
+    setSaveError(null);
 
     try {
       await updateDisplayName(user.id, displayName.trim());
       await refreshProfile();
       toast.success('Nombre actualizado correctamente.');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al guardar los cambios.');
+      const message = err instanceof Error ? err.message : 'Error al guardar los cambios.';
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    // signOut redirige a la portada incluso si Supabase falla
+    await signOut();
+  };
+
   if (!profile) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-red-500" />
+      <div className="flex items-center justify-center py-20" role="status">
+        <Loader2 className="h-6 w-6 animate-spin text-accent" aria-hidden="true" />
+        <span className="sr-only">Cargando cuenta…</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      {/* Page header */}
-      <div>
-        <h1 className="text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">
-          Cuenta
-        </h1>
-        <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1">
-          Administra tu información personal y suscripción.
-        </p>
-      </div>
+    <div className="flex flex-col gap-4">
+      <header className="mb-2 flex flex-col gap-1">
+        <h1 className="font-display text-3xl font-bold tracking-tight">Cuenta</h1>
+        <p className="text-sm text-muted">Tu información personal, tu plan y tu sesión.</p>
+      </header>
 
-      {/* Account Information */}
-      <section className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl p-6 space-y-5">
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-          <User className="w-5 h-5 text-neutral-400" />
-          Información Personal
-        </h2>
-
-        {/* Email (read-only) */}
-        <div>
-          <label className="flex items-center gap-1.5 text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            <Mail className="w-3.5 h-3.5 text-neutral-400" />
-            Email
-          </label>
-          <div className="px-3 py-2.5 text-sm text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-            {user?.email}
+      <AccountSection title="Información personal">
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex min-w-0 flex-col gap-1">
+            <dt className="flex items-center gap-1.5 text-sm text-muted">
+              <Mail className="h-4 w-4" aria-hidden="true" />
+              Email
+            </dt>
+            <dd className="truncate text-[15px] font-medium">{user?.email}</dd>
           </div>
-        </div>
+          <div className="flex flex-col gap-1">
+            <dt className="flex items-center gap-1.5 text-sm text-muted">
+              <Calendar className="h-4 w-4" aria-hidden="true" />
+              Miembro desde
+            </dt>
+            <dd className="text-[15px] font-medium">{formatDate(profile.created_at)}</dd>
+          </div>
+        </dl>
 
-        {/* Display Name (editable) */}
-        <div>
-          <label htmlFor="account-name" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Nombre <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="account-name"
+        <form onSubmit={handleSave} noValidate className="flex flex-col gap-3 border-t border-line pt-5">
+          <TextField
+            label="Nombre"
             type="text"
+            autoComplete="name"
+            required
             value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
+            onChange={(e) => {
+              setDisplayName(e.target.value);
+              setSaveError(null);
+            }}
             placeholder="Tu nombre"
-            className="w-full px-3 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out text-sm"
+            error={!isValid ? 'Escribe tu nombre.' : undefined}
           />
-        </div>
 
-        {/* Member since */}
-        <div>
-          <label className="flex items-center gap-1.5 text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-            Miembro desde
-          </label>
-          <div className="px-3 py-2.5 text-sm text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-            {formatDate(profile.created_at)}
-          </div>
-        </div>
+          {saveError && (
+            <p role="alert" className="flex items-start gap-2 rounded-2xl bg-accent-soft p-3 text-sm text-accent">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              No se pudo guardar tu nombre: {saveError}
+            </p>
+          )}
 
-        {/* Save name */}
-        {hasChanges && (
-          <div className="pt-2">
-            <button
-              onClick={handleSave}
-              disabled={isSaving || !isValid}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  Guardar Nombre
-                </>
-              )}
-            </button>
-          </div>
-        )}
-      </section>
+          {hasChanges && (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="submit"
+                loading={isSaving}
+                disabled={!isValid}
+                icon={<Save className="h-4 w-4" aria-hidden="true" />}
+              >
+                {isSaving ? 'Guardando…' : 'Guardar nombre'}
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={isSaving}
+                onClick={() => {
+                  setDisplayName(profile.display_name || '');
+                  setSaveError(null);
+                }}
+              >
+                Descartar
+              </Button>
+            </div>
+          )}
+        </form>
+      </AccountSection>
 
-      {/* Plan */}
-      <section className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl p-6 space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-700">
-            <CreditCard className="w-5 h-5 text-neutral-600 dark:text-neutral-300" />
-          </div>
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-            Plan actual
-          </h2>
-        </div>
-
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-neutral-50 dark:bg-neutral-700/50">
-          <Zap className="w-4 h-4 text-red-500" />
-          <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-            Plan Gratuito
+      <AccountSection title="Plan actual">
+        <div className="flex items-center gap-3 rounded-2xl bg-ground p-4">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft">
+            <Zap className="h-5 w-5 text-accent" aria-hidden="true" />
           </span>
+          <div className="flex flex-col">
+            <span className="font-display text-base font-semibold">Plan Gratuito</span>
+            <span className="text-sm text-muted">Funciones premium y planes de suscripción estarán disponibles próximamente.</span>
+          </div>
         </div>
+      </AccountSection>
 
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          Funciones premium y planes de suscripción estarán disponibles próximamente.
-        </p>
-      </section>
+      <AccountSection title="Sesión">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted">Cierra la sesión en este dispositivo.</p>
+          <Button
+            variant="secondary"
+            icon={<LogOut className="h-4 w-4" aria-hidden="true" />}
+            onClick={() => setConfirmSignOut(true)}
+            className="shrink-0"
+          >
+            Cerrar sesión
+          </Button>
+        </div>
+      </AccountSection>
 
-      {/* Danger Zone */}
-      <section className="border border-neutral-200 dark:border-neutral-700 rounded-xl p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-          Zona de Peligro
-        </h2>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          Estas acciones son permanentes y no se pueden deshacer.
-        </p>
-        <button
-          disabled
-          className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 border border-red-300 dark:border-red-500/30 rounded-lg opacity-50 cursor-not-allowed"
-        >
-          Eliminar cuenta (próximamente)
-        </button>
-      </section>
+      <AccountSection title="Zona de peligro">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p id={deleteNoteId} className="text-sm text-muted">
+            Eliminar tu cuenta es permanente y no se puede deshacer. Disponible próximamente.
+          </p>
+          <Button variant="danger" disabled aria-describedby={deleteNoteId} className="shrink-0">
+            Eliminar cuenta
+          </Button>
+        </div>
+      </AccountSection>
+
+      <ConfirmDialog
+        open={confirmSignOut}
+        onClose={() => setConfirmSignOut(false)}
+        onConfirm={handleSignOut}
+        loading={signingOut}
+        title="¿Cerrar sesión?"
+        description="Vas a salir de Forgia en este dispositivo. Tus datos se quedan guardados."
+        confirmLabel="Cerrar sesión"
+      />
     </div>
   );
 }
