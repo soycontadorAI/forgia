@@ -111,7 +111,7 @@ interface ChatStreamRequest {
 }
 
 /**
- * Abre un stream de texto. Espera el primer evento antes de devolver para que
+ * Abre un stream de texto. Espera la respuesta HTTP antes de devolver para que
  * los errores de conexión o de límite lleguen como excepción y la ruta pueda
  * responder con un status HTTP en lugar de un stream vacío.
  */
@@ -133,36 +133,29 @@ export async function openTextStream({
     output_config: { effort },
   });
 
-  const iterator = stream[Symbol.asyncIterator]();
-  const first = await iterator.next();
   const encoder = new TextEncoder();
-
-  const textOf = (event: Anthropic.Beta.Messages.BetaRawMessageStreamEvent): string | null =>
-    event.type === 'content_block_delta' && event.delta.type === 'text_delta' ? event.delta.text : null;
-
-  return new ReadableStream<Uint8Array>({
+  // Los listeners se registran antes de esperar la respuesta para no perder deltas.
+  const body = new ReadableStream<Uint8Array>({
     start(controller) {
-      if (!first.done) {
-        const text = textOf(first.value);
-        if (text) controller.enqueue(encoder.encode(text));
-      }
-    },
-    async pull(controller) {
-      try {
-        const { value, done } = await iterator.next();
-        if (done) {
+      const close = () => {
+        try {
           controller.close();
-          return;
+        } catch {
+          // ya cerrado o cancelado por el cliente
         }
-        const text = textOf(value);
-        if (text) controller.enqueue(encoder.encode(text));
-      } catch (error) {
+      };
+      stream.on('text', (delta) => controller.enqueue(encoder.encode(delta)));
+      stream.on('end', close);
+      stream.on('error', (error) => {
         console.error('Error durante el stream de IA:', error);
-        controller.close();
-      }
+        close();
+      });
     },
     cancel() {
       stream.abort();
     },
   });
+
+  await stream.withResponse();
+  return body;
 }
