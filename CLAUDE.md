@@ -31,7 +31,7 @@ NEXT_PUBLIC_GA_ID=...             # Optional, GA4
 - **Next.js 16** (App Router) + **React 19** + **TypeScript 5**
 - **Tailwind CSS 4** via PostCSS (no tailwind.config — uses CSS-based config in `globals.css`)
 - **Supabase** for PostgreSQL database + auth (email/password)
-- **Claude** (`@anthropic-ai/sdk`, model `claude-opus-5-5`) for AI generation — server-side only, shared client in `src/lib/ai/claude.ts`, Zod output schemas in `src/lib/ai/schemas.ts`
+- **Claude** (`@anthropic-ai/sdk`; model per route in `AI_MODELS`: Opus 5.5 for WOD/program, Sonnet 5.5 for chat, Haiku 5.5 for weekly analysis) for AI generation — server-side only, shared client in `src/lib/ai/claude.ts`, Zod output schemas in `src/lib/ai/schemas.ts`
 - **pnpm** as package manager
 - Path alias: `@/*` maps to `./src/*`
 

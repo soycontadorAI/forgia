@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { z } from 'zod';
-import { generateStructured, isAIConfigured, isTransientAIError, systemBlocks } from '@/lib/ai/claude';
+import { AI_MODELS, generateStructured, isAIConfigured, isTransientAIError, systemBlocks } from '@/lib/ai/claude';
 import { wodSchema } from '@/lib/ai/schemas';
 import { requireUser, rateLimitHeaders } from '@/lib/api-auth';
 import { parseJsonBody } from '@/lib/api-validation';
@@ -488,6 +488,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const wodData = await generateStructured({
+      model: AI_MODELS.wod,
       // Caché del system prompt: regenerar con una nota reutiliza el mismo prefijo
       system: systemBlocks(systemInstruction, true),
       user: userPrompt,

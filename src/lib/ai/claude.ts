@@ -2,12 +2,24 @@ import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import type { z } from 'zod';
 
-// Modelo único para todas las rutas de IA; cambiarlo aquí cambia todo el backend.
-export const AI_MODEL = 'claude-opus-5-5';
+// Modelo por ruta: Opus donde la calidad del plan importa, Sonnet para el chat
+// (tono y latencia) y Haiku para resumir datos ya estructurados.
+export const AI_MODELS = {
+  wod: 'claude-opus-5-5',
+  program: 'claude-opus-5-5',
+  chat: 'claude-sonnet-5-5',
+  weeklyAnalysis: 'claude-haiku-5-5',
+} as const;
+
+export type AIModel = (typeof AI_MODELS)[keyof typeof AI_MODELS];
 
 // Si el modelo declina por política, el API reintenta del lado del servidor
-// con el modelo que Anthropic recomienda para esa categoría.
-const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+// con el modelo que Anthropic recomienda para esa categoría. Haiku no tiene
+// fallback del lado del servidor, así que no se le manda el parámetro.
+function fallbackParams(model: AIModel) {
+  if (model === 'claude-haiku-5-5') return {};
+  return { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const };
+}
 
 export type AIEffort = 'low' | 'medium' | 'high';
 
@@ -58,6 +70,7 @@ export function systemBlocks(parts: string[], cache = false): SystemBlocks {
 }
 
 interface StructuredRequest<T extends z.ZodType> {
+  model: AIModel;
   system: SystemBlocks;
   user: string;
   schema: T;
@@ -67,6 +80,7 @@ interface StructuredRequest<T extends z.ZodType> {
 
 /** Genera JSON validado contra el esquema Zod (structured outputs). */
 export async function generateStructured<T extends z.ZodType>({
+  model,
   system,
   user,
   schema,
@@ -74,10 +88,9 @@ export async function generateStructured<T extends z.ZodType>({
   maxTokens = 16000,
 }: StructuredRequest<T>): Promise<z.infer<T>> {
   const response = await getAnthropic().beta.messages.parse({
-    model: AI_MODEL,
+    model,
     max_tokens: maxTokens,
-    betas: [FALLBACK_BETA],
-    fallbacks: 'default',
+    ...fallbackParams(model),
     system,
     messages: [{ role: 'user', content: user }],
     output_config: { effort, format: betaZodOutputFormat(schema) },
@@ -90,6 +103,7 @@ export async function generateStructured<T extends z.ZodType>({
 }
 
 interface ChatStreamRequest {
+  model: AIModel;
   system: SystemBlocks;
   messages: Anthropic.Beta.Messages.BetaMessageParam[];
   effort: AIEffort;
@@ -102,16 +116,16 @@ interface ChatStreamRequest {
  * responder con un status HTTP en lugar de un stream vacío.
  */
 export async function openTextStream({
+  model,
   system,
   messages,
   effort,
   maxTokens = 4000,
 }: ChatStreamRequest): Promise<ReadableStream<Uint8Array>> {
   const stream = getAnthropic().beta.messages.stream({
-    model: AI_MODEL,
+    model,
     max_tokens: maxTokens,
-    betas: [FALLBACK_BETA],
-    fallbacks: 'default',
+    ...fallbackParams(model),
     // Caché automático del prefijo: system + historial previo de la conversación
     cache_control: { type: 'ephemeral' },
     system,

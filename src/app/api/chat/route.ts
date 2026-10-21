@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireUser, rateLimitHeaders } from '@/lib/api-auth';
 import { parseJsonBody } from '@/lib/api-validation';
 import { trackUsage } from '@/lib/rate-limit';
-import { isAIConfigured, isTransientAIError, openTextStream, systemBlocks } from '@/lib/ai/claude';
+import { AI_MODELS, isAIConfigured, isTransientAIError, openTextStream, systemBlocks } from '@/lib/ai/claude';
 import type { Profile } from '@/types/profile';
 import type { Wod } from '@/types/wod';
 import type { ChatHistoryEntry } from '@/types/chat';
@@ -260,6 +260,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const readableStream = await openTextStream({
+      model: AI_MODELS.chat,
       system: systemBlocks([systemInstruction]),
       messages: [
         ...chatHistory.map((entry) => ({ role: entry.role, content: entry.content })),

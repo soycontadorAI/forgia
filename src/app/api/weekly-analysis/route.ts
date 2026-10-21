@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { requireUser, rateLimitHeaders, rateLimitExceededResponse } from '@/lib/api-auth';
 import { checkRateLimit, trackUsage } from '@/lib/rate-limit';
-import { generateStructured, isAIConfigured, systemBlocks } from '@/lib/ai/claude';
+import { AI_MODELS, generateStructured, isAIConfigured, systemBlocks } from '@/lib/ai/claude';
 import { weeklyAnalysisSchema } from '@/lib/ai/schemas';
 import type { Profile } from '@/types/profile';
 import type { WeeklyAnalysisData, WeeklyAnalysisResponse } from '@/types/weekly-analysis';
@@ -150,6 +150,7 @@ export async function GET(request: NextRequest) {
   try {
     const profile = profileResult.data as Profile;
     const analysis: WeeklyAnalysisData = await generateStructured({
+      model: AI_MODELS.weeklyAnalysis,
       system: systemBlocks([buildSystemInstruction(profile)]),
       user: buildUserPrompt(feedbackRecords),
       schema: weeklyAnalysisSchema,

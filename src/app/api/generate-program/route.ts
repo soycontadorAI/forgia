@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { requireUser, rateLimitHeaders } from '@/lib/api-auth';
 import { trackUsage } from '@/lib/rate-limit';
-import { generateStructured, isAIConfigured, isTransientAIError, systemBlocks } from '@/lib/ai/claude';
+import { AI_MODELS, generateStructured, isAIConfigured, isTransientAIError, systemBlocks } from '@/lib/ai/claude';
 import { programSchema } from '@/lib/ai/schemas';
 import type { Profile } from '@/types/profile';
 import type { ProgramWeek } from '@/types/program';
@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const programData = await generateStructured({
+      model: AI_MODELS.program,
       system: systemBlocks([prompt]),
       user: 'Genera el programa de 4 semanas para este atleta.',
       schema: programSchema,
