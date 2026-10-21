@@ -1,96 +1,62 @@
-'use client';
-
-import type { WodTemplate, TemplateResult } from '@/types/wod-template';
-import { Clock, Dumbbell } from 'lucide-react';
-
-const categoryColors: Record<string, string> = {
-  girl: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300',
-  hero: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
-  benchmark: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
-};
-
-const categoryLabels: Record<string, string> = {
-  girl: 'Girl',
-  hero: 'Hero',
-  benchmark: 'Benchmark',
-};
-
-const difficultyColors: Record<string, string> = {
-  Novato: 'text-emerald-500',
-  Principiante: 'text-blue-500',
-  Intermedio: 'text-amber-500',
-  Avanzado: 'text-red-500',
-};
-
-function formatScore(result: TemplateResult): string {
-  switch (result.score_type) {
-    case 'time': {
-      const mins = Math.floor(result.score_value / 60);
-      const secs = Math.round(result.score_value % 60);
-      return `${mins}:${String(secs).padStart(2, '0')}`;
-    }
-    case 'rounds':
-      return `${result.score_value} rondas`;
-    case 'reps':
-      return `${result.score_value} reps`;
-    case 'weight':
-      return `${result.score_value}`;
-    default:
-      return `${result.score_value}`;
-  }
-}
+import Link from 'next/link';
+import { ChevronRight, Clock } from 'lucide-react';
+import type { TemplateResult } from '@/types/wod-template';
+import { CATEGORY_LABELS, formatScore, type TemplateSummary } from './template-format';
 
 interface TemplateCardProps {
-  template: WodTemplate;
-  bestResult?: TemplateResult | null;
-  onClick: () => void;
+  template: TemplateSummary;
+  lastResult?: TemplateResult | null;
+  /** Mientras llegan los resultados del usuario se muestra un hueco en vez del último registro */
+  resultsLoading?: boolean;
+  /** Si falló la carga no se afirma "Sin registro"; el aviso de error va arriba de la lista */
+  resultsUnavailable?: boolean;
 }
 
-export default function TemplateCard({ template, bestResult, onClick }: TemplateCardProps) {
+export default function TemplateCard({ template, lastResult, resultsLoading = false, resultsUnavailable = false }: TemplateCardProps) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full text-left bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl p-5 hover:border-neutral-300 dark:hover:border-neutral-600 transition-all duration-200 hover:shadow-sm"
+    <Link
+      href={`/app/biblioteca/${template.id}`}
+      className="group flex h-full flex-col gap-3 rounded-3xl bg-surface p-4 transition-colors hover:bg-raised sm:p-5"
     >
-      {/* Header: name + badge */}
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-100">
-          {template.name}
-        </h3>
-        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${categoryColors[template.category]}`}>
-          {categoryLabels[template.category]}
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted">
+          {CATEGORY_LABELS[template.category]}
+        </span>
+        <span className="truncate rounded-full bg-raised px-2.5 py-1 font-mono text-xs text-fg group-hover:bg-ground">
+          {template.format}
         </span>
       </div>
 
-      {/* Description */}
-      <p className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 mb-3">
-        {template.description}
-      </p>
-
-      {/* Meta row */}
-      <div className="flex items-center gap-3 text-xs text-neutral-400 dark:text-neutral-500">
-        <span className={`font-semibold ${difficultyColors[template.difficulty]}`}>
-          {template.difficulty}
-        </span>
-        <span className="flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          ~{template.estimatedMinutes} min
-        </span>
-        <span className="flex items-center gap-1">
-          <Dumbbell className="w-3 h-3" />
-          {template.equipmentRequired.length}
-        </span>
+      <div className="flex flex-col gap-1">
+        <h2 className="font-display text-2xl font-bold tracking-tight text-fg">{template.name}</h2>
+        <p className="line-clamp-2 text-sm leading-snug text-muted">{template.description}</p>
       </div>
 
-      {/* Best result badge */}
-      {bestResult && (
-        <div className="mt-3 flex items-center gap-1.5 text-xs">
-          <span className="font-semibold text-red-500">
-            PR: {formatScore(bestResult)} {bestResult.rx_or_scaled}
+      <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-3">
+        <div className="flex flex-col gap-0.5 text-xs text-muted">
+          <span>{template.difficulty}</span>
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3" aria-hidden="true" />~{template.estimatedMinutes} min
           </span>
         </div>
-      )}
-    </button>
+
+        <div className="flex items-center gap-1">
+          {resultsLoading ? (
+            <span className="h-9 w-16 animate-pulse rounded-xl bg-raised" aria-hidden="true" />
+          ) : lastResult ? (
+            <div className="flex flex-col items-end">
+              <span className="text-[11px] text-muted">Último</span>
+              <span className="font-display text-lg font-bold leading-tight text-fg">
+                {formatScore(lastResult)}{' '}
+                <span className="font-sans text-xs font-medium text-muted">{lastResult.rx_or_scaled}</span>
+              </span>
+            </div>
+          ) : resultsUnavailable ? null : (
+            <span className="text-xs text-muted">Sin registro</span>
+          )}
+          <ChevronRight className="h-4 w-4 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+        </div>
+      </div>
+    </Link>
   );
 }
