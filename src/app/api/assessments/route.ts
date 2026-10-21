@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { requireUser, rateLimitHeaders } from '@/lib/api-auth';
 import { parseJsonBody } from '@/lib/api-validation';
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Error al crear evaluación. Intenta de nuevo.' }, { status: 500 });
   }
 
-  await trackUsage(supabase, user.id, 'assessment');
+  after(() => trackUsage(supabase, user.id, 'assessment'));
 
   return NextResponse.json(data, { headers: rateLimitHeaders(auth.rateLimit) });
 }

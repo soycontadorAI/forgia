@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
 import { requireUser, rateLimitHeaders } from '@/lib/api-auth';
@@ -294,8 +294,8 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Track usage after starting the stream (fire-and-forget)
-      trackUsage(supabase, user.id, 'chat').catch(() => {});
+      // Track usage after the response is sent
+      after(() => trackUsage(supabase, user.id, 'chat'));
 
       return new Response(readableStream, {
         headers: {

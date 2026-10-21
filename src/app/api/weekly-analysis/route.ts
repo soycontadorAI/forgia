@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
 import { requireUser, rateLimitHeaders, rateLimitExceededResponse } from '@/lib/api-auth';
 import { checkRateLimit, trackUsage } from '@/lib/rate-limit';
@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    await trackUsage(supabase, user.id, 'weekly_analysis');
+    after(() => trackUsage(supabase, user.id, 'weekly_analysis'));
     return NextResponse.json(
       { feedbackCount: feedbackRecords.length, analysis },
       { headers: rateLimitHeaders(rateLimit) }

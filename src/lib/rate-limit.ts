@@ -28,26 +28,28 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   const limit = DAILY_LIMITS[action];
 
-  // Admin bypass: unlimited usage
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .single();
-
-  if (profile?.role === 'admin') {
-    return { allowed: true, remaining: 999, limit };
-  }
-
   const twentyFourHoursAgo = new Date();
   twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-  const { count, error } = await supabase
-    .from('usage_tracking')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('action', action)
-    .gte('created_at', twentyFourHoursAgo.toISOString());
+  // Role lookup and usage count in parallel (count is ignored for admins)
+  const [{ data: profile }, { count, error }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single(),
+    supabase
+      .from('usage_tracking')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('action', action)
+      .gte('created_at', twentyFourHoursAgo.toISOString()),
+  ]);
+
+  // Admin bypass: unlimited usage
+  if (profile?.role === 'admin') {
+    return { allowed: true, remaining: 999, limit };
+  }
 
   if (error) {
     console.error('Rate limit check failed:', error);
