@@ -11,7 +11,8 @@ function getInitial(name: string | null): string {
 export default function UserAvatar({ displayName, size = 'size-10' }: UserAvatarProps) {
   return (
     <div
-      className={`${size} rounded-full bg-red-500 text-white font-bold flex items-center justify-center shrink-0 text-sm`}
+      aria-hidden="true"
+      className={`${size} rounded-full bg-linear-to-br from-red-500 to-orange-500 text-neutral-950 font-display font-bold flex items-center justify-center shrink-0 text-sm`}
     >
       {getInitial(displayName)}
     </div>
