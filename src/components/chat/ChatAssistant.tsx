@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { MessageCircle } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { toast } from 'sonner';
 import { useChatContext } from '@/contexts/ChatContext';
 import { sendChatMessage } from '@/lib/ai-client';
@@ -32,6 +33,7 @@ function saveMessages(messages: ChatMessage[], wodId: string | null) {
 }
 
 export default function ChatAssistant() {
+  const pathname = usePathname();
   const { currentWod } = useChatContext();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -170,6 +172,9 @@ export default function ChatAssistant() {
 
   // Por encima de la barra inferior (móvil) y, si hay WOD, de la barra de acciones
   const fabBottom = currentWod ? 'bottom-[calc(var(--tabbar-h)+6rem)]' : 'bottom-[calc(var(--tabbar-h)+1.5rem)]';
+
+  // En el onboarding la barra de Atrás/Siguiente ocupa esa esquina y todavía no hay perfil
+  if (pathname.startsWith('/app/onboarding')) return null;
 
   return (
     <>

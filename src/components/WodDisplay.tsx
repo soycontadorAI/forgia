@@ -7,12 +7,14 @@ const SECTION_ORDER: WodSectionKey[] = ['warmUp', 'strengthSkill', 'metcon', 'co
 
 interface WodDisplayProps {
   wod: PartialWod;
+  /** Fecha del WOD; por defecto hoy. `null` la oculta (plantillas de la biblioteca). */
+  date?: Date | string | null;
   /** Durante el streaming: las secciones que faltan se muestran como lugar reservado */
   streaming?: boolean;
 }
 
-const WodDisplay: React.FC<WodDisplayProps> = ({ wod, streaming = false }) => {
-  const dateStr = new Intl.DateTimeFormat('es-MX', { dateStyle: 'long' }).format(new Date());
+const WodDisplay: React.FC<WodDisplayProps> = ({ wod, streaming = false, date }) => {
+  const dateStr = date === null ? null : new Intl.DateTimeFormat('es-MX', { dateStyle: 'long' }).format(date ? new Date(date) : new Date());
   const minutes = SECTION_ORDER.map((key) => estimateSectionMinutes(wod[key], key));
   const total = minutes.reduce((sum, m) => sum + m, 0);
 
@@ -24,7 +26,7 @@ const WodDisplay: React.FC<WodDisplayProps> = ({ wod, streaming = false }) => {
       <div className="rounded-3xl bg-surface p-4 motion-safe:animate-fade-in-up sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs text-muted">{dateStr}</p>
+            {dateStr && <p className="text-xs text-muted">{dateStr}</p>}
             {wod.title ? (
               <h2 className="print-title font-display text-3xl font-bold leading-tight tracking-tight text-fg">{wod.title}</h2>
             ) : (

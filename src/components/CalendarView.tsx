@@ -277,7 +277,7 @@ export default function CalendarView({
                 {/* Expanded WOD detail */}
                 {expandedId === saved.id && (
                   <div className="animate-fade-in-up border-t border-neutral-200 dark:border-neutral-700 pt-4">
-                    <WodDisplay wod={saved.wod} />
+                    <WodDisplay wod={saved.wod} date={saved.created_at} />
                     <div className="flex flex-wrap justify-center items-center gap-3 mt-6">
                       <CopyWodButton wod={saved.wod} />
                       <PrintWodButton />

@@ -192,7 +192,7 @@ export default function WodListView({
                       <p className="hidden print:block print-date text-center text-sm text-neutral-500 mb-4">
                         {new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(saved.created_at))}
                       </p>
-                      <WodDisplay wod={saved.wod} />
+                      <WodDisplay wod={saved.wod} date={saved.created_at} />
                     </div>
                   )}
 

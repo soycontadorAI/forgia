@@ -44,6 +44,8 @@ const nextConfig: NextConfig = {
               "img-src 'self' blob: data: https://*.supabase.co",
               "font-src 'self'",
               "connect-src 'self' https://*.supabase.co https://www.google-analytics.com https://region1.google-analytics.com",
+              // Demos de movimientos embebidos (sin cookies de seguimiento)
+              "frame-src https://www.youtube-nocookie.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
