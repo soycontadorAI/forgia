@@ -16,7 +16,7 @@ import {
 import type { Profile } from '@/types/profile';
 import type { Wod } from '@/types/wod';
 import type { ChatHistoryEntry } from '@/types/chat';
-import type { ProgramWeek } from '@/types/program';
+import { fetchProgramWithProgress } from '@/lib/program-progress';
 
 const chatBodySchema = z.object({
   message: z.string().trim().min(1).max(2000),
@@ -62,9 +62,6 @@ export async function POST(request: NextRequest) {
   const wod = (parsed.data.context?.wod ?? null) as Wod | null;
 
   // Fetch profile + recent feedback + active program in parallel
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
   const twentyEightDaysAgo = new Date();
   twentyEightDaysAgo.setDate(twentyEightDaysAgo.getDate() - 28);
 
@@ -81,13 +78,7 @@ export async function POST(request: NextRequest) {
       .gte('created_at', twentyEightDaysAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(3),
-    supabase
-      .from('training_programs')
-      .select('structure')
-      .eq('user_id', user.id)
-      .eq('month', currentMonth)
-      .eq('year', currentYear)
-      .single(),
+    fetchProgramWithProgress(supabase, user.id),
   ]);
 
   if (profileResult.error || !profileResult.data) {
@@ -104,12 +95,9 @@ export async function POST(request: NextRequest) {
   const wodContext = wod ? serializeWod(wod) : '';
   const feedbackSummary = buildFeedbackSummary(feedbackRecords);
 
-  let programSummary = '';
-  if (programResult.data?.structure) {
-    const weeks = programResult.data.structure as ProgramWeek[];
-    const weekNumber = Math.min(Math.ceil(now.getDate() / 7), 4);
-    programSummary = buildProgramSummary(weeks, weekNumber);
-  }
+  const programSummary = programResult
+    ? buildProgramSummary(programResult.program.weeks, programResult.progress.weekNumber)
+    : '';
 
   const athleteContext = buildChatContext(profile, wodContext, programSummary, feedbackSummary);
 

@@ -62,6 +62,10 @@ export async function POST(request: NextRequest) {
           month,
           year,
           structure: weeks,
+          // Regenerar reinicia el avance: el programa empieza hoy desde la sesión 1
+          started_at: now.toISOString(),
+          session_offset: 0,
+          resume_ack_at: null,
         },
         { onConflict: 'user_id,month,year' }
       )
@@ -85,6 +89,9 @@ export async function POST(request: NextRequest) {
         year: saved.year,
         weeks,
         created_at: saved.created_at,
+        started_at: saved.started_at,
+        session_offset: saved.session_offset,
+        resume_ack_at: saved.resume_ack_at,
       },
       { headers: rateLimitHeaders(auth.rateLimit) }
     );

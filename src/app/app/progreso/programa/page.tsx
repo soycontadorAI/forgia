@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { CalendarRange, Check, ChevronDown, RefreshCw } from 'lucide-react';
-import type { MonthlyProgram, ProgramWeek, ProgramSession } from '@/types/program';
-import { getActiveProgram, getWodCountThisWeek, getCurrentWeekNumber } from '@/lib/programs';
+import type { ProgramWeek, ProgramSession } from '@/types/program';
+import { getActiveProgramWithProgress, type ActiveProgram, type ProgramProgress } from '@/lib/programs';
 import { generateProgram } from '@/lib/ai-client';
 import Spinner from '@/components/Spinner';
 import LevelAssessmentCard from '@/components/LevelAssessmentCard';
@@ -61,7 +61,7 @@ function MesocycleCard({ weeks, currentWeek }: { weeks: ProgramWeek[]; currentWe
           <div key={w.number} className="flex flex-col">
             <span className={cx('text-xs', w.number === currentWeek ? 'text-accent' : 'text-muted')}>
               Sem {w.number}
-              {w.number === currentWeek ? ' · hoy' : ''}
+              {w.number === currentWeek ? ' · actual' : ''}
             </span>
             <span className={cx('truncate text-[13px]', w.number === currentWeek ? 'font-semibold' : 'text-muted')}>{w.focus}</span>
           </div>
@@ -118,7 +118,7 @@ function WeekCard({ week, isCurrentWeek, completedSessions }: { week: ProgramWee
           <p className="mt-0.5 truncate text-xs text-muted">Skill: {week.skillFocus}</p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          {isCurrentWeek && (
+          {(isCurrentWeek || completedSessions > 0) && (
             <span className="font-mono text-xs text-muted">
               {Math.min(completedSessions, week.sessions.length)}/{week.sessions.length}
             </span>
@@ -133,7 +133,7 @@ function WeekCard({ week, isCurrentWeek, completedSessions }: { week: ProgramWee
             <SessionRow
               key={session.order}
               session={session}
-              isCompleted={isCurrentWeek && session.order <= completedSessions}
+              isCompleted={session.order <= completedSessions}
               isCurrent={isCurrentWeek && session.order === completedSessions + 1}
             />
           ))}
@@ -143,32 +143,40 @@ function WeekCard({ week, isCurrentWeek, completedSessions }: { week: ProgramWee
   );
 }
 
+/** Sesiones completadas de cada semana según la posición en el programa. */
+function completedInWeek(week: ProgramWeek, progress: ProgramProgress) {
+  if (progress.finished || week.number < progress.weekNumber) return week.sessions.length;
+  return week.number === progress.weekNumber ? progress.sessionIndex : 0;
+}
+
 export default function ProgramaPage() {
-  const [program, setProgram] = useState<MonthlyProgram | null>(null);
+  const [program, setProgram] = useState<ActiveProgram | null>(null);
+  const [progress, setProgress] = useState<ProgramProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [currentWeek, setCurrentWeek] = useState(1);
-  const [wodsThisWeek, setWodsThisWeek] = useState(0);
   const [messageIndex, setMessageIndex] = useState(0);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const now = new Date();
-        const prog = await getActiveProgram(now.getMonth() + 1, now.getFullYear());
-        setProgram(prog);
-        setCurrentWeek(getCurrentWeekNumber());
-        const count = await getWodCountThisWeek();
-        setWodsThisWeek(count);
-      } catch {
-        toast.error('No pudimos cargar tu programa. Revisa tu conexión.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+  const loadProgram = useCallback(async () => {
+    const result = await getActiveProgramWithProgress();
+    setProgram(result?.program ?? null);
+    setProgress(result?.progress ?? null);
+    return result;
   }, []);
+
+  useEffect(() => {
+    loadProgram()
+      .then((result) => {
+        // "Programa nuevo" desde Hoy llega con ?nuevo=1: se confirma aquí antes de reemplazarlo
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('nuevo')) {
+          window.history.replaceState(null, '', window.location.pathname);
+          if (result) setConfirmRegenerate(true);
+        }
+      })
+      .catch(() => toast.error('No pudimos cargar tu programa. Revisa tu conexión.'))
+      .finally(() => setLoading(false));
+  }, [loadProgram]);
 
   useEffect(() => {
     if (!generating) {
@@ -185,19 +193,18 @@ export default function ProgramaPage() {
     setConfirmRegenerate(false);
     setGenerating(true);
     try {
-      const result = await generateProgram();
-      setProgram(result);
-      setCurrentWeek(getCurrentWeekNumber());
-      const count = await getWodCountThisWeek();
-      setWodsThisWeek(count);
+      await generateProgram();
+      await loadProgram();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al generar el programa.');
     } finally {
       setGenerating(false);
     }
-  }, []);
+  }, [loadProgram]);
 
-  const monthName = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(new Date());
+  const startedLabel = program
+    ? new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long' }).format(new Date(program.started_at))
+    : null;
 
   if (loading) {
     return (
@@ -210,7 +217,11 @@ export default function ProgramaPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted first-letter:uppercase">{monthName}</p>
+        <p className="text-sm text-muted">
+          {program && progress
+            ? `Desde el ${startedLabel} · ${progress.totalCompleted} de ${progress.totalSessions} sesiones`
+            : 'Programa de 4 semanas'}
+        </p>
         {program && !generating && (
           <Button variant="secondary" size="sm" onClick={() => setConfirmRegenerate(true)} icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}>
             Regenerar
@@ -228,9 +239,9 @@ export default function ProgramaPage() {
       {!generating && !program && (
         <Card className="flex flex-col items-center gap-3 px-6 py-12 text-center">
           <CalendarRange className="h-10 w-10 text-muted" aria-hidden="true" />
-          <h2 className="font-display text-lg font-semibold">Sin programa este mes</h2>
+          <h2 className="font-display text-lg font-semibold">Sin programa activo</h2>
           <p className="max-w-sm text-sm text-muted">
-            Genera tu mesociclo de 4 semanas: base, volumen, intensidad y deload. Cada WOD diario sigue este plan.
+            Genera tu mesociclo de 4 semanas: base, volumen, intensidad y deload. Avanzas cada vez que registras un resultado, sin importar qué día sea.
           </p>
           <Button onClick={handleGenerate} icon={<CalendarRange className="h-4 w-4" aria-hidden="true" />}>
             Generar programa
@@ -238,15 +249,15 @@ export default function ProgramaPage() {
         </Card>
       )}
 
-      {!generating && program && (
+      {!generating && program && progress && (
         <>
-          <MesocycleCard weeks={program.weeks} currentWeek={currentWeek} />
+          <MesocycleCard weeks={program.weeks} currentWeek={progress.weekNumber} />
           {program.weeks.map((week) => (
             <WeekCard
               key={week.number}
               week={week}
-              isCurrentWeek={week.number === currentWeek}
-              completedSessions={week.number === currentWeek ? wodsThisWeek : 0}
+              isCurrentWeek={!progress.finished && week.number === progress.weekNumber}
+              completedSessions={completedInWeek(week, progress)}
             />
           ))}
         </>
@@ -259,7 +270,7 @@ export default function ProgramaPage() {
         onClose={() => setConfirmRegenerate(false)}
         onConfirm={handleGenerate}
         title="¿Regenerar el programa?"
-        description="Se reemplaza el plan de este mes por uno nuevo. Tus WODs y resultados no se borran."
+        description="Empiezas un programa nuevo desde la sesión 1. Tus WODs y resultados no se borran."
         confirmLabel="Regenerar"
       />
     </div>
