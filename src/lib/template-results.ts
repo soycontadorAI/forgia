@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client';
 import type { TemplateResult, TemplateResultInput } from '@/types/wod-template';
+import { notifyResultSaved } from '@/lib/consistency';
 
 export async function saveTemplateResult(
   userId: string,
@@ -20,6 +21,7 @@ export async function saveTemplateResult(
     .single();
 
   if (error) throw new Error(`Error al guardar resultado: ${error.message}`);
+  notifyResultSaved();
   return data as TemplateResult;
 }
 
