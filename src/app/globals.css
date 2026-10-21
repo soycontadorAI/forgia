@@ -2,11 +2,48 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Sistema de diseño "Pulso" (dirección C).
+ * - La escala neutral de Tailwind se reemplaza por grises fríos: todas las
+ *   clases neutral-* existentes adoptan la paleta sin tocar cada componente.
+ * - Los tokens semánticos (ground, surface, fg, accent…) cambian con el tema;
+ *   úsalos en componentes nuevos en lugar de pares neutral/dark:neutral.
+ */
+@theme {
+  --color-neutral-50: #f8f8fa;
+  --color-neutral-100: #f1f1f4;
+  --color-neutral-200: #e4e4e8;
+  --color-neutral-300: #c9cad1;
+  --color-neutral-400: #9b9ca6;
+  --color-neutral-500: #6b6c76;
+  --color-neutral-600: #4a4b55;
+  --color-neutral-700: #2b2c33;
+  --color-neutral-800: #1a1b20;
+  --color-neutral-900: #101114;
+  --color-neutral-950: #0b0b0e;
+}
+
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--ground);
+  --color-foreground: var(--fg);
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-solid: var(--accent-solid);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-flare: var(--flare);
+  --color-warmup: var(--warmup);
+  --color-strength: var(--strength);
+  --color-metcon: var(--metcon);
+  --color-cooldown: var(--cooldown);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-space-grotesk);
   --animate-fade-in-up: fade-in-up 0.4s ease-out both;
   --animate-timer-pulse: timer-pulse 1s ease-in-out infinite;
   --animate-forge: forge 1.2s ease-in-out infinite;
@@ -19,6 +56,32 @@ html {
   scroll-behavior: smooth;
 }
 
+body {
+  background: var(--ground);
+  color: var(--fg);
+}
+
+/* Foco visible en todo el sitio. Va fuera de capas para ganarle a los
+   outline-none de componentes viejos. */
+:focus-visible {
+  outline: 2px solid var(--flare);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -29,13 +92,47 @@ html {
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ground: #ffffff;
+  --surface: #f1f1f4;
+  --raised: #e4e4e8;
+  --line: #e4e4e8;
+  --fg: #101114;
+  --muted: #5c5d68;
+  --accent: #dc2626;
+  --accent-solid: #dc2626;
+  --accent-soft: #fef2f2;
+  --on-accent: #ffffff;
+  --flare: #ea580c;
+  --warmup: #b45309;
+  --strength: #1d4ed8;
+  --metcon: #dc2626;
+  --cooldown: #047857;
+  /* Alto de la barra inferior en móvil; las barras fijas se apilan encima */
+  --tabbar-h: calc(4rem + env(safe-area-inset-bottom, 0px));
 }
 
 .dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --ground: #101114;
+  --surface: #1a1b20;
+  --raised: #26272e;
+  --line: #2b2c33;
+  --fg: #f4f4f6;
+  --muted: #9b9ca6;
+  --accent: #f87171;
+  --accent-solid: #dc2626;
+  --accent-soft: #2b1a1c;
+  --on-accent: #ffffff;
+  --flare: #fb923c;
+  --warmup: #fbbf24;
+  --strength: #60a5fa;
+  --metcon: #f87171;
+  --cooldown: #34d399;
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --tabbar-h: 0px;
+  }
 }
 
 @keyframes fade-in-up {
@@ -195,8 +292,8 @@ html {
   }
 
   .dark {
-    --background: #ffffff;
-    --foreground: #171717;
+    --ground: #ffffff;
+    --fg: #171717;
   }
 
   header,
