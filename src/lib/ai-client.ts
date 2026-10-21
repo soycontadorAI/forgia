@@ -5,6 +5,26 @@ import type { TrainingIntelligenceResponse } from '@/app/api/training-intelligen
 import type { LevelAssessment, AssessmentSelfReport } from '@/types/assessment';
 import type { ChatHistoryEntry } from '@/types/chat';
 
+/** Evento que abre la hoja de permiso de IA (la escucha AIConsentGate). */
+export const AI_CONSENT_EVENT = 'forgia:ai-consent-required';
+
+/** Abre la hoja de permiso desde cualquier parte de la app. */
+export function requestAIConsent() {
+  window.dispatchEvent(new Event(AI_CONSENT_EVENT));
+}
+
+/** Si la API rechazó por falta de permiso de IA, pide el permiso al usuario. */
+function requestConsentIfNeeded(response: Response) {
+  if (response.status !== 403) return;
+  response
+    .clone()
+    .json()
+    .then((data) => {
+      if (data?.code === 'ai_consent_required') requestAIConsent();
+    })
+    .catch(() => {});
+}
+
 export async function generateProgram(): Promise<MonthlyProgram> {
   const response = await fetch('/api/generate-program', {
     method: 'POST',
@@ -12,6 +32,7 @@ export async function generateProgram(): Promise<MonthlyProgram> {
   });
 
   if (!response.ok) {
+    requestConsentIfNeeded(response);
     const errorData = await response.json().catch(() => ({ error: `Error del servidor (estado ${response.status})` }));
     if (response.status === 429) {
       throw new Error(errorData.error || 'Has alcanzado el límite diario. Intenta de nuevo mañana.');
@@ -30,6 +51,7 @@ export async function generateWod(request?: GenerateWodRequest): Promise<Wod> {
   });
 
   if (!response.ok) {
+    requestConsentIfNeeded(response);
     const errorData = await response.json().catch(() => ({ error: `Error del servidor (estado ${response.status})` }));
     if (response.status === 429) {
       throw new Error(errorData.error || 'Has alcanzado el límite diario. Intenta de nuevo mañana.');
@@ -63,6 +85,7 @@ export async function generateWodStream(
   });
 
   if (!response.ok || !response.body) {
+    requestConsentIfNeeded(response);
     const errorData = await response.json().catch(() => ({ error: `Error del servidor (estado ${response.status})` }));
     if (response.status === 429) {
       throw new Error(errorData.error || 'Has alcanzado el límite diario. Intenta de nuevo mañana.');
@@ -162,6 +185,7 @@ export async function sendChatMessage(
   });
 
   if (!response.ok) {
+    requestConsentIfNeeded(response);
     const errorData = await response.json().catch(() => ({ error: 'Error del servidor' }));
     if (response.status === 429) {
       throw new Error(errorData.error || 'Has alcanzado el límite diario de mensajes. Intenta de nuevo mañana.');

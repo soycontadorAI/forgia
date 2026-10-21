@@ -25,7 +25,11 @@ export type AuthResult =
 interface RequireUserOptions {
   rateLimit?: RateLimitedAction;
   authMessage?: string;
+  /** Exige profiles.ai_consent_at: la ruta envía datos del usuario a Anthropic */
+  aiConsent?: boolean;
 }
+
+export const AI_CONSENT_REQUIRED = 'ai_consent_required';
 
 /**
  * Autentica la petición vía cookie de sesión (web) o header
@@ -66,6 +70,27 @@ export async function requireUser(
         { status: 401 }
       ),
     };
+  }
+
+  // Antes del rate limit: una petición sin permiso no consume la cuota
+  if (options.aiConsent) {
+    const { data: consent } = await supabase
+      .from('profiles')
+      .select('ai_consent_at')
+      .eq('id', user.id)
+      .single();
+    if (!consent?.ai_consent_at) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          {
+            error: 'Para usar el coach con IA necesitas permitir que tus datos de entrenamiento se envíen a Anthropic.',
+            code: AI_CONSENT_REQUIRED,
+          },
+          { status: 403 }
+        ),
+      };
+    }
   }
 
   let rateLimit: RateLimitResult | null = null;

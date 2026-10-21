@@ -39,6 +39,8 @@ export interface Profile {
   weight_unit: WeightUnit;
   training_frequency: number | null;
   terms_accepted_at: string | null;
+  /** Permiso para enviar datos de entrenamiento a Anthropic (Claude); null = sin permiso */
+  ai_consent_at: string | null;
   gender: Gender | null;
   weight: number | null;
   height: number | null;

@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
   // Authenticate + rate limit
   const auth = await requireUser(request, {
     rateLimit: 'chat',
+    aiConsent: true,
     authMessage: 'No autorizado. Inicia sesión para usar el Coach IA.',
   });
   if (!auth.ok) return auth.response;

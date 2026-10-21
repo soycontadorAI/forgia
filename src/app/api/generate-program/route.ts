@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
 
   const auth = await requireUser(request, {
     rateLimit: 'generate_program',
+    aiConsent: true,
     authMessage: 'No autorizado. Inicia sesión.',
   });
   if (!auth.ok) return auth.response;

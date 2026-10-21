@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
   // Authenticate user + rate limit
   const auth = await requireUser(request, {
     rateLimit: 'generate_wod',
+    aiConsent: true,
     authMessage: 'No autorizado. Inicia sesión para generar un WOD.',
   });
   if (!auth.ok) return auth.response;
