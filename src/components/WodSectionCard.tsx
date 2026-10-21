@@ -1,219 +1,153 @@
-import type { WodSection } from '@/types/wod';
-import { Clock, AlertTriangle } from 'lucide-react';
+import type { WodSection, WodSectionKey } from '@/types/wod';
+import { AlertTriangle, Clock, Dumbbell, Flame, HeartPulse, Timer, type LucideIcon } from 'lucide-react';
+import { cx } from '@/lib/cx';
 
-type SectionType = 'warmUp' | 'strengthSkill' | 'metcon' | 'coolDown';
+type SectionType = WodSectionKey;
 
 interface WodSectionCardProps {
-  section: WodSection;
+  section: Partial<WodSection>;
   sectionType: SectionType;
   animationDelay?: string;
 }
 
-const accentColorMap: Record<SectionType, string> = {
-  warmUp: 'bg-amber-400',
-  strengthSkill: 'bg-blue-400',
-  metcon: 'bg-red-500',
-  coolDown: 'bg-emerald-400',
+interface SectionStyle {
+  label: string;
+  icon: LucideIcon;
+  /** Color de texto/ícono del token de la sección */
+  text: string;
+  /** Fondo suave para el ícono y viñetas */
+  soft: string;
+  dot: string;
+}
+
+export const SECTION_STYLES: Record<SectionType, SectionStyle> = {
+  warmUp: { label: 'Calentamiento', icon: Flame, text: 'text-warmup', soft: 'bg-warmup/12', dot: 'bg-warmup' },
+  strengthSkill: { label: 'Fuerza / Habilidad', icon: Dumbbell, text: 'text-strength', soft: 'bg-strength/12', dot: 'bg-strength' },
+  metcon: { label: 'Metcon', icon: Timer, text: 'text-metcon', soft: 'bg-metcon/12', dot: 'bg-metcon' },
+  coolDown: { label: 'Enfriamiento', icon: HeartPulse, text: 'text-cooldown', soft: 'bg-cooldown/12', dot: 'bg-cooldown' },
 };
 
-const iconColorMap: Record<SectionType, string> = {
-  warmUp: 'text-amber-500 dark:text-amber-400',
-  strengthSkill: 'text-blue-500 dark:text-blue-400',
-  metcon: 'text-red-500',
-  coolDown: 'text-emerald-500 dark:text-emerald-400',
-};
+// "15 Wall Balls (9/6 kg)" → reps "15", movimiento "Wall Balls (9/6 kg)"
+function splitReps(item: string): { reps: string | null; movement: string } {
+  const match = item.match(/^(\d+(?:[.,]\d+)?\s?(?:cal|m|km|reps?)?)\s+(.+)$/i);
+  return match ? { reps: match[1], movement: match[2] } : { reps: null, movement: item };
+}
 
-const iconBgMap: Record<SectionType, string> = {
-  warmUp: 'bg-amber-500/10 text-amber-500 dark:text-amber-400',
-  strengthSkill: 'bg-blue-500/10 text-blue-500 dark:text-blue-400',
-  metcon: 'bg-red-500/15 text-red-500',
-  coolDown: 'bg-emerald-500/10 text-emerald-500 dark:text-emerald-400',
-};
-
-const bulletColorMap: Record<SectionType, string> = {
-  warmUp: 'bg-amber-400',
-  strengthSkill: 'bg-blue-400',
-  metcon: 'bg-red-500',
-  coolDown: 'bg-emerald-400',
-};
-
-const subtitleMap: Record<SectionType, string> = {
-  warmUp: 'Activación',
-  strengthSkill: 'Potencia',
-  metcon: 'High Intensity',
-  coolDown: 'Recuperación',
-};
-
-// --- Internal SVG Icons ---
-
-const SectionIcon: React.FC<{ sectionType: SectionType }> = ({ sectionType }) => {
-  const cls = 'h-5 w-5';
-  switch (sectionType) {
-    case 'warmUp':
-      return (
-        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-        </svg>
-      );
-    case 'strengthSkill':
-      return (
-        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="m6.5 6.5 11 11" /><path d="m21 21-1-1" /><path d="m3 3 1 1" /><path d="m18 22 4-4" /><path d="m2 6 4-4" /><path d="m3 10 7-7" /><path d="m14 21 7-7" />
-        </svg>
-      );
-    case 'metcon':
-      return (
-        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-        </svg>
-      );
-    case 'coolDown':
-      return (
-        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-        </svg>
-      );
-  }
-};
-
-
-// --- Helper Render Functions ---
-
-function renderMetconItems(items: string[]) {
+function MetconItems({ items }: { items: string[] }) {
   return (
-    <div className="space-y-0 mt-3">
+    <ul className="divide-y divide-line">
       {items.map((item, index) => {
-        // Try to split "15 Wall Balls (9/6 kg)" into reps and movement
-        const match = item.match(/^(\d+[\s\w]*?)\s+(.+)$/);
+        const { reps, movement } = splitReps(item);
         return (
-          <div
-            key={index}
-            className="flex items-center gap-3 py-3 border-b border-neutral-200/40 dark:border-neutral-700/30 last:border-b-0"
-          >
-            {match && (
-              <span className="text-sm font-bold text-red-500 shrink-0 w-12 text-right">
-                {match[1].trim()}
-              </span>
-            )}
-            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
-              {match ? match[2] : item}
-            </span>
-          </div>
+          <li key={index} className="flex items-baseline gap-3 py-2.5">
+            <span className="w-16 shrink-0 text-right font-display text-base font-bold text-metcon tabular-nums">{reps ?? '·'}</span>
+            <span className="text-[15px] font-medium text-fg">{movement}</span>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }
 
-function renderBulletItems(items: string[], sectionType: SectionType) {
+function BulletItems({ items, dot }: { items: string[]; dot: string }) {
   return (
-    <ul className="space-y-2.5 mt-3">
+    <ul className="flex flex-col gap-2">
       {items.map((item, index) => (
-        <li key={index} className="flex items-start">
-          <span className={`shrink-0 w-1.5 h-1.5 ${bulletColorMap[sectionType]} rounded-full mr-3 mt-2`} />
-          <span className="text-sm text-neutral-600 dark:text-neutral-300">{item}</span>
+        <li key={index} className="flex items-start gap-3">
+          <span className={cx('mt-2 h-1.5 w-1.5 shrink-0 rounded-full', dot)} aria-hidden="true" />
+          <span className="text-[15px] leading-relaxed text-fg/90">{item}</span>
         </li>
       ))}
     </ul>
   );
 }
 
-function renderStrategyTip(notes: string, label?: string) {
-  return (
-    <div className="mt-4 flex items-start gap-2.5 p-3 bg-amber-500/5 dark:bg-amber-500/10 rounded-lg border border-amber-500/20">
-      <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-0.5">
-          {label || 'Estrategia'}
-        </p>
-        <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">{notes}</p>
-      </div>
-    </div>
-  );
-}
-
-// --- Main Component ---
-
 const WodSectionCard: React.FC<WodSectionCardProps> = ({ section, sectionType, animationDelay }) => {
+  const style = SECTION_STYLES[sectionType];
+  const Icon = style.icon;
   const isMetcon = sectionType === 'metcon';
   const items = section.movements || section.parts || section.details || [];
-
-  const cardBg = isMetcon
-    ? 'bg-neutral-50 dark:bg-neutral-800/80 border-red-500/20 dark:border-red-500/10 shadow-sm'
-    : 'bg-white dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700/60';
+  // La etiqueta sobra cuando el título ya la dice ("Calentamiento", "Metcon")
+  const showLabel = section.title?.trim().toLowerCase() !== style.label.toLowerCase();
 
   return (
-    <div
-      className={`print-card relative rounded-xl overflow-hidden border ${cardBg} animate-fade-in-up`}
+    <section
+      aria-label={style.label}
+      className={cx(
+        'print-card motion-safe:animate-fade-in-up rounded-3xl bg-surface p-4 sm:p-5',
+        isMetcon && 'ring-1 ring-metcon/25'
+      )}
       style={animationDelay ? { animationDelay } : undefined}
     >
-      {/* Left accent bar */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${accentColorMap[sectionType]} rounded-l-xl`} />
-
-      {/* Metcon gradient overlay */}
-      {isMetcon && (
-        <div className="absolute inset-0 bg-linear-to-br from-red-500/5 to-transparent pointer-events-none" />
-      )}
-
-      <div className="relative pl-5 pr-5 py-5">
-        {/* Header row */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="min-w-0 flex-1">
-            <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${iconColorMap[sectionType]}`}>
-              {subtitleMap[sectionType]}
-            </p>
-            <h3 className={`${isMetcon ? 'text-xl' : 'text-lg'} font-bold text-neutral-900 dark:text-neutral-100`}>
-              {section.title}
-            </h3>
-            {/* Duration + type badges */}
-            <div className="flex items-center gap-2 mt-1.5">
+      <div className="flex items-start gap-3">
+        <span className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl', style.soft, style.text)}>
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          {showLabel && <p className={cx('text-xs font-medium', style.text)}>{style.label}</p>}
+          <h3 className={cx('font-display font-semibold tracking-tight text-fg', isMetcon ? 'text-xl' : 'text-lg')}>
+            {section.title}
+          </h3>
+          {(section.duration || section.type) && (
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
               {section.duration && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                  <Clock className="h-3.5 w-3.5" />
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                   {section.duration}
                 </span>
               )}
               {section.type && (
-                <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide ${
-                  isMetcon
-                    ? 'bg-red-500/15 text-red-500'
-                    : 'bg-neutral-200 dark:bg-neutral-700/60 text-neutral-600 dark:text-neutral-300'
-                }`}>
+                <span className={cx('rounded-full px-2 py-0.5 font-semibold', isMetcon ? 'bg-metcon/12 text-metcon' : 'bg-raised text-fg')}>
                   {section.type}
                 </span>
               )}
             </div>
-          </div>
-          {/* Circular icon */}
-          <div className={`shrink-0 ml-3 w-10 h-10 rounded-full flex items-center justify-center ${iconBgMap[sectionType]}`}>
-            <SectionIcon sectionType={sectionType} />
+          )}
+        </div>
+      </div>
+
+      {section.description && <p className="mt-3 text-[15px] leading-relaxed text-fg/90">{section.description}</p>}
+
+      {items.length > 0 && (
+        <div className="mt-3">{isMetcon ? <MetconItems items={items} /> : <BulletItems items={items} dot={style.dot} />}</div>
+      )}
+
+      {section.notes && (
+        <div className={cx('mt-4 flex items-start gap-2.5 rounded-2xl p-3', isMetcon ? 'bg-warmup/10' : 'bg-raised/60')}>
+          {isMetcon && <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warmup" aria-hidden="true" />}
+          <div className="min-w-0">
+            <p className={cx('text-xs font-semibold', isMetcon ? 'text-warmup' : 'text-muted')}>
+              {section.notesLabel || (isMetcon ? 'Escalado y estrategia' : 'Notas')}
+            </p>
+            <p className="text-sm leading-relaxed text-fg/90">{section.notes}</p>
           </div>
         </div>
+      )}
+    </section>
+  );
+};
 
-        {/* Description */}
-        {section.description && (
-          <p className="mb-3 text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
-            {section.description}
-          </p>
-        )}
-
-        {/* Items list */}
-        {items.length > 0 && (
-          isMetcon ? renderMetconItems(items) : renderBulletItems(items, sectionType)
-        )}
-
-        {/* Metcon: strategy tip from notes */}
-        {isMetcon && section.notes && renderStrategyTip(section.notes, section.notesLabel)}
-
-        {/* Non-metcon: regular notes */}
-        {!isMetcon && section.notes && (
-          <p className="mt-4 text-sm italic text-neutral-500 dark:text-neutral-400 border-t border-neutral-200/60 dark:border-neutral-700/40 pt-3">
-            <strong className={iconColorMap[sectionType]}>Notas:</strong> {section.notes}
-          </p>
-        )}
+/** Lugar reservado mientras la sección todavía no llega en el streaming. */
+export function WodSectionSkeleton({ sectionType }: { sectionType: SectionType }) {
+  const style = SECTION_STYLES[sectionType];
+  const Icon = style.icon;
+  return (
+    <div className="rounded-3xl bg-surface p-4 sm:p-5" aria-hidden="true">
+      <div className="flex items-center gap-3">
+        <span className={cx('flex h-10 w-10 items-center justify-center rounded-2xl opacity-60', style.soft, style.text)}>
+          <Icon className="h-5 w-5" />
+        </span>
+        <div className="flex flex-1 flex-col gap-2">
+          <p className={cx('text-xs font-medium opacity-70', style.text)}>{style.label}</p>
+          <span className="h-4 w-2/5 rounded-full bg-raised motion-safe:animate-pulse" />
+        </div>
+      </div>
+      <div className="mt-4 flex flex-col gap-2">
+        <span className="h-3 w-full rounded-full bg-raised motion-safe:animate-pulse" />
+        <span className="h-3 w-4/5 rounded-full bg-raised motion-safe:animate-pulse" />
       </div>
     </div>
   );
-};
+}
 
 export default WodSectionCard;

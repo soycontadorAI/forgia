@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
-import type { Wod, WorkoutFeedback } from '@/types/wod';
+import type { PartialWod, Wod, WorkoutFeedback } from '@/types/wod';
 import type { LiveWorkoutResult } from '@/components/live/LiveWorkoutOverlay';
-import { generateWod } from '@/lib/ai-client';
+import { generateWodStream } from '@/lib/ai-client';
 import { saveWod, getLatestWod, bulkInsertWods } from '@/lib/wods';
 import { useAuth } from '@/contexts/AuthContext';
 import Spinner from '@/components/Spinner';
@@ -14,6 +14,8 @@ import CopyWodButton from '@/components/CopyWodButton';
 import PrintWodButton from '@/components/PrintWodButton';
 import TrainingIntelligenceCard from '@/components/TrainingIntelligenceCard';
 import ProgramBanner from '@/components/ProgramBanner';
+import { Button, IconButton } from '@/components/ui/Button';
+import { TextAreaField } from '@/components/ui/Field';
 import { trackWodGenerated, trackWodSaved, trackWorkoutStarted } from '@/lib/analytics';
 import { useChatContext } from '@/contexts/ChatContext';
 import { Zap, Dices, ClipboardCheck, Play, Bookmark, BookmarkCheck } from 'lucide-react';
@@ -21,28 +23,29 @@ import { Zap, Dices, ClipboardCheck, Play, Bookmark, BookmarkCheck } from 'lucid
 const LiveWorkoutOverlay = dynamic(() => import('@/components/live/LiveWorkoutOverlay'), { ssr: false });
 const WorkoutFeedbackForm = dynamic(() => import('@/components/WorkoutFeedbackForm'), { ssr: false });
 
-const LOADING_PHRASES = [
-  'Personalizando tu infierno diario...',
-  'Consultando con el dios de los burpees...',
-  'Calculando cuánto vas a sufrir hoy...',
-  'Preparando tu dosis de humildad...',
-  'La IA está eligiendo tus movimientos favoritos (los que odias)...',
-  'Generando excusas creativas para mañana...',
-  'Activando modo "no pain, no gain"...',
-  'Mezclando sudor, lágrimas y wall balls...',
-  'Preguntándole a ChatGPT si eres capaz...',
-  'Diseñando tu nueva relación amor-odio con el gimnasio...',
-  'Cargando el soundtrack perfecto para tus gemidos...',
-  'Invocando el espíritu de Rich Froning...',
+// Lo que de verdad pasa mientras el modelo piensa, en el orden en que lo hace
+const THINKING_MESSAGES = [
+  'Revisando tus últimas 4 semanas',
+  'Balanceando estímulos',
+  'Calculando cargas con tus records',
+  'Armando el metcon',
 ];
 
+function greeting(date: Date): string {
+  const hour = date.getHours();
+  if (hour < 12) return 'Buenos días';
+  if (hour < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
 export default function AppPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { setCurrentWod } = useChatContext();
   const [wod, setWod] = useState<Wod | null>(null);
+  const [partialWod, setPartialWod] = useState<PartialWod | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingLatest, setIsLoadingLatest] = useState(true);
-  const [currentDate, setCurrentDate] = useState('');
+  const [header, setHeader] = useState({ date: '', greeting: '' });
   const [sessionNotes, setSessionNotes] = useState('');
   const [justSaved, setJustSaved] = useState(false);
   const [savedWodId, setSavedWodId] = useState<string | null>(null);
@@ -50,18 +53,24 @@ export default function AppPage() {
   const [savedFeedback, setSavedFeedback] = useState<WorkoutFeedback | null>(null);
   const [showLiveMode, setShowLiveMode] = useState(false);
   const [liveSession, setLiveSession] = useState<LiveWorkoutResult | null>(null);
-  const [loadingPhraseIndex, setLoadingPhraseIndex] = useState(0);
+  const [thinkingIndex, setThinkingIndex] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Sync WOD to ChatContext so Coach IA has context
   useEffect(() => {
     setCurrentWod(wod);
   }, [wod, setCurrentWod]);
 
+  // Cancelar la generación si el usuario sale de la pantalla
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   // Load latest saved WOD from Supabase on mount
   useEffect(() => {
-    setCurrentDate(
-      new Intl.DateTimeFormat('es-ES', { dateStyle: 'full' }).format(new Date())
-    );
+    const now = new Date();
+    setHeader({
+      date: new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }).format(now),
+      greeting: greeting(now),
+    });
 
     const loadLatest = async () => {
       try {
@@ -108,23 +117,27 @@ export default function AppPage() {
     migrateLocalStorage();
   }, [user]);
 
-  // Rotate loading phrases every 2 seconds
+  // Mensajes de avance mientras el modelo piensa y todavía no llega texto
+  const waitingForText = isLoading && !partialWod?.title;
   useEffect(() => {
-    if (!isLoading) {
-      setLoadingPhraseIndex(0);
+    if (!waitingForText) {
+      setThinkingIndex(0);
       return;
     }
-
     const interval = setInterval(() => {
-      setLoadingPhraseIndex((prev) => (prev + 1) % LOADING_PHRASES.length);
-    }, 2000);
-
+      setThinkingIndex((prev) => Math.min(prev + 1, THINKING_MESSAGES.length - 1));
+    }, 3500);
     return () => clearInterval(interval);
-  }, [isLoading]);
+  }, [waitingForText]);
 
   const handleGenerate = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsLoading(true);
     setWod(null);
+    setPartialWod({});
     setJustSaved(false);
     setSavedWodId(null);
     setShowFeedback(false);
@@ -132,21 +145,25 @@ export default function AppPage() {
     setLiveSession(null);
 
     try {
-      const newWod = await generateWod(
-        sessionNotes.trim() ? { sessionNotes: sessionNotes.trim() } : undefined
+      const newWod = await generateWodStream(
+        sessionNotes.trim() ? { sessionNotes: sessionNotes.trim() } : undefined,
+        (event) => {
+          if (event.type === 'partial') setPartialWod(event.wod);
+        },
+        controller.signal
       );
       setWod(newWod);
       trackWodGenerated(user?.email || 'unknown');
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : 'Ocurrió un error desconocido al generar el WOD.'
-      );
+      if (controller.signal.aborted) return;
+      toast.error(err instanceof Error ? err.message : 'Ocurrió un error desconocido al generar el WOD.');
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) {
+        setIsLoading(false);
+        setPartialWod(null);
+      }
     }
-  }, [sessionNotes]);
+  }, [sessionNotes, user]);
 
   const handleSaveWod = useCallback(async () => {
     if (!wod || !user) return;
@@ -168,13 +185,16 @@ export default function AppPage() {
   }, []);
 
   const renderContent = () => {
-    if (isLoading) {
+    if (isLoading && partialWod) {
       return (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Spinner />
-          <p className="mt-4 text-sm text-neutral-500 dark:text-neutral-400 min-h-6 transition-opacity duration-300">
-            {LOADING_PHRASES[loadingPhraseIndex]}
-          </p>
+        <div className="flex flex-col gap-3">
+          {waitingForText && (
+            <p className="flex items-center gap-2 text-sm text-muted" role="status">
+              <span className="h-2 w-2 rounded-full bg-accent motion-safe:animate-pulse" aria-hidden="true" />
+              {THINKING_MESSAGES[thinkingIndex]}…
+            </p>
+          )}
+          <WodDisplay wod={partialWod} streaming />
         </div>
       );
     }
@@ -186,103 +206,98 @@ export default function AppPage() {
       );
     }
     if (wod) {
-      return (
-        <>
-          <WodDisplay wod={wod} />
-        </>
-      );
+      return <WodDisplay wod={wod} />;
     }
     return (
-      <div className="text-center py-16">
-        <Dices className="h-12 w-12 mx-auto text-neutral-300 dark:text-neutral-600 mb-4" />
-        <h3 className="text-lg font-medium text-neutral-500 dark:text-neutral-400 mb-2">No hay WOD todavía</h3>
-        <p className="text-sm text-neutral-400 dark:text-neutral-500">Haz clic en &ldquo;Generar WOD&rdquo; para crear tu entrenamiento del día.</p>
+      <div className="flex flex-col items-center rounded-3xl bg-surface px-6 py-12 text-center">
+        <Dices className="mb-4 h-10 w-10 text-muted" aria-hidden="true" />
+        <h2 className="font-display text-lg font-semibold">Todavía no hay WOD</h2>
+        <p className="mt-1 max-w-xs text-sm text-muted">Genera tu entrenamiento del día; se arma con tu perfil y tus últimas 4 semanas.</p>
       </div>
     );
   };
+
+  const name = profile?.display_name?.split(' ')[0];
 
   return (
     <>
       {/* Page header */}
       <div className="mb-6">
-        <h1 className="print-title text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">Tu Entrenamiento</h1>
-        <p className="print-date text-neutral-500 dark:text-neutral-400 text-sm mt-1">{currentDate}</p>
+        <p className="text-sm text-muted first-letter:uppercase">{header.date}</p>
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+          {header.greeting}
+          {name ? `, ${name}` : ''}
+        </h1>
       </div>
 
       <TrainingIntelligenceCard />
 
       <ProgramBanner />
 
-      {/* Session notes — always visible */}
-      <div data-print-hide className="mb-6">
-        <label htmlFor="sessionNotes" className="block text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-2">
-          Notas de sesión <span className="font-normal text-neutral-400 dark:text-neutral-500">(opcional)</span>
-        </label>
-        <textarea
+      <div data-print-hide className="mb-6 flex flex-col gap-3">
+        <TextAreaField
           id="sessionNotes"
+          label="Nota para la sesión (opcional)"
           value={sessionNotes}
           onChange={(e) => setSessionNotes(e.target.value)}
-          placeholder="Ej: Hoy quiero enfoque en gimnásticos, tengo 45 min..."
-          className="w-full px-4 py-3 text-sm rounded-xl border border-neutral-200 dark:border-neutral-700/60 bg-white dark:bg-neutral-800/50 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
-          rows={3}
+          placeholder="Ej: hoy quiero gimnásticos y tengo 45 min"
+          rows={2}
+          maxLength={500}
         />
+        <Button
+          size="lg"
+          fullWidth
+          onClick={handleGenerate}
+          loading={isLoading}
+          icon={<Zap className="h-5 w-5" aria-hidden="true" />}
+        >
+          {isLoading ? 'Generando…' : wod ? 'Generar otro WOD' : 'Generar WOD'}
+        </Button>
       </div>
-
-      {/* Generate CTA — full width */}
-      <button
-        data-print-hide
-        onClick={handleGenerate}
-        disabled={isLoading}
-        className="w-full flex items-center justify-center gap-2 h-14 mb-8 text-base font-bold uppercase tracking-wider text-white bg-red-500 rounded-xl hover:bg-red-600 shadow-lg shadow-red-500/25 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-red-400 dark:focus:ring-offset-neutral-900"
-      >
-        <Zap className="h-5 w-5" />
-        {wod ? 'Generar Nuevo' : 'Generar WOD'}
-      </button>
 
       {/* Content area */}
-      <div className={wod && !showLiveMode ? 'pb-28' : ''}>
-        {renderContent()}
-      </div>
+      <div className={wod && !showLiveMode ? 'pb-28' : ''}>{renderContent()}</div>
 
       {/* Floating Action Bar */}
       {wod && !showLiveMode && (
         <div data-print-hide className="fixed bottom-(--tabbar-h) left-0 right-0 z-40">
-          {/* Gradient fade */}
           <div className="h-8 bg-linear-to-t from-ground to-transparent" />
-          {/* Action bar */}
-          <div className="bg-ground border-t border-line px-[max(1rem,env(safe-area-inset-left,1rem))] sm:pb-[env(safe-area-inset-bottom,0px)]">
-            <div className="container mx-auto max-w-4xl flex items-center justify-between py-3">
-              {/* Left: utility buttons */}
-              <div className="flex items-center gap-2">
+          <div className="border-t border-line bg-ground px-[max(1rem,env(safe-area-inset-left,1rem))] sm:pb-[env(safe-area-inset-bottom,0px)]">
+            <div className="container mx-auto flex max-w-4xl items-center justify-between py-3">
+              <div className="flex items-center gap-1">
                 <CopyWodButton wod={wod} variant="icon" />
                 <PrintWodButton variant="icon" />
-                <button
+                <IconButton
+                  label={savedWodId || justSaved ? 'WOD guardado' : 'Guardar WOD'}
                   onClick={handleSaveWod}
                   disabled={justSaved || !!savedWodId}
-                  className="flex items-center justify-center w-10 h-10 rounded-full border border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 hover:text-red-500 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                  aria-label={justSaved ? 'Guardado' : savedWodId ? 'Guardado' : 'Guardar WOD'}
                 >
-                  {savedWodId ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-                </button>
+                  {savedWodId ? <BookmarkCheck className="h-5 w-5" aria-hidden="true" /> : <Bookmark className="h-5 w-5" aria-hidden="true" />}
+                </IconButton>
               </div>
-              {/* Right: main actions */}
               <div className="flex items-center gap-2">
                 {!savedFeedback && (
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => setShowFeedback((prev) => !prev)}
-                    className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-semibold rounded-lg border-2 border-red-500 text-red-500 hover:bg-red-500/10 transition-colors"
+                    aria-label="Registrar resultado"
+                    icon={<ClipboardCheck className="h-4 w-4" aria-hidden="true" />}
                   >
-                    <ClipboardCheck className="h-4 w-4" />
                     <span className="hidden sm:inline">Registrar</span>
-                  </button>
+                  </Button>
                 )}
-                <button
-                  onClick={() => { trackWorkoutStarted(); setShowLiveMode(true); }}
-                  className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 shadow-lg shadow-red-500/25 transition-colors"
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    trackWorkoutStarted();
+                    setShowLiveMode(true);
+                  }}
+                  aria-label="Empezar entrenamiento"
+                  icon={<Play className="h-4 w-4" aria-hidden="true" />}
                 >
-                  <Play className="h-4 w-4" />
-                  <span className="hidden sm:inline">Iniciar Entrenamiento</span>
-                </button>
+                  Empezar
+                </Button>
               </div>
             </div>
           </div>
