@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { requireUser, rateLimitHeaders } from '@/lib/api-auth';
+import { trackUsage } from '@/lib/rate-limit';
 import { parseJsonBody } from '@/lib/api-validation';
 import type { AssessmentSelfReport } from '@/types/assessment';
 
@@ -112,6 +113,9 @@ export async function POST(
 
     levelChanged = !profileError;
   }
+
+  // El límite 'assessment' cubre iniciar y completar; sin esto, completar nunca contaba
+  after(() => trackUsage(supabase, user.id, 'assessment'));
 
   return NextResponse.json(
     { assessment: updated, levelChanged },
