@@ -1,6 +1,7 @@
 import type { WodSection, WodSectionKey } from '@/types/wod';
 import { AlertTriangle, Clock, Dumbbell, Flame, HeartPulse, Timer, type LucideIcon } from 'lucide-react';
 import { cx } from '@/lib/cx';
+import MovementGuide from '@/components/MovementGuide';
 
 type SectionType = WodSectionKey;
 
@@ -39,9 +40,10 @@ function MetconItems({ items }: { items: string[] }) {
       {items.map((item, index) => {
         const { reps, movement } = splitReps(item);
         return (
-          <li key={index} className="flex items-baseline gap-3 py-2.5">
+          <li key={index} className="flex items-center gap-3 py-2.5">
             <span className="w-16 shrink-0 text-right font-display text-base font-bold text-metcon tabular-nums">{reps ?? '·'}</span>
-            <span className="text-[15px] font-medium text-fg">{movement}</span>
+            <span className="flex-1 text-[15px] font-medium text-fg">{movement}</span>
+            <MovementGuide text={item} />
           </li>
         );
       })}
@@ -55,7 +57,8 @@ function BulletItems({ items, dot }: { items: string[]; dot: string }) {
       {items.map((item, index) => (
         <li key={index} className="flex items-start gap-3">
           <span className={cx('mt-2 h-1.5 w-1.5 shrink-0 rounded-full', dot)} aria-hidden="true" />
-          <span className="text-[15px] leading-relaxed text-fg/90">{item}</span>
+          <span className="flex-1 text-[15px] leading-relaxed text-fg/90">{item}</span>
+          <MovementGuide text={item} />
         </li>
       ))}
     </ul>
