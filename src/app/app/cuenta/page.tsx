@@ -2,13 +2,14 @@
 
 import { useState, useId, type FormEvent, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { AlertCircle, Calendar, Loader2, LogOut, Mail, Save, Zap } from 'lucide-react';
+import { AlertCircle, Calendar, Loader2, LogOut, Mail, Save, Trash2, Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateDisplayName } from '@/lib/profiles';
+import { deleteAccount } from '@/lib/account';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { TextField } from '@/components/ui/Field';
-import { ConfirmDialog } from '@/components/ui/Dialog';
+import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 
 function formatDate(isoString: string | null): string {
   if (!isoString) return 'No disponible';
@@ -38,6 +39,11 @@ export default function CuentaPage() {
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const deleteNoteId = useId();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteText, setDeleteText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const canDelete = deleteText.trim().toUpperCase() === 'ELIMINAR';
 
   // Cuando llega (o se refresca) el perfil, el campo vuelve al nombre guardado
   const [syncedProfile, setSyncedProfile] = useState(profile);
@@ -73,6 +79,27 @@ export default function CuentaPage() {
     setSigningOut(true);
     // signOut redirige a la portada incluso si Supabase falla
     await signOut();
+  };
+
+  const closeDelete = () => {
+    if (deleting) return;
+    setConfirmDelete(false);
+    setDeleteText('');
+    setDeleteError(null);
+  };
+
+  const handleDelete = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!canDelete || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount();
+      window.location.href = '/';
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'No se pudo eliminar tu cuenta. Intenta de nuevo.');
+      setDeleting(false);
+    }
   };
 
   if (!profile) {
@@ -185,13 +212,55 @@ export default function CuentaPage() {
       <AccountSection title="Zona de peligro">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p id={deleteNoteId} className="text-sm text-muted">
-            Eliminar tu cuenta es permanente y no se puede deshacer. Disponible próximamente.
+            Borra tu cuenta y todo lo que guardaste: perfil, WODs, resultados, PRs y programas. No se puede deshacer.
           </p>
-          <Button variant="danger" disabled aria-describedby={deleteNoteId} className="shrink-0">
+          <Button
+            variant="danger"
+            aria-describedby={deleteNoteId}
+            className="shrink-0"
+            icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+            onClick={() => setConfirmDelete(true)}
+          >
             Eliminar cuenta
           </Button>
         </div>
       </AccountSection>
+
+      <Dialog
+        open={confirmDelete}
+        onClose={closeDelete}
+        title="¿Eliminar tu cuenta?"
+        description="Se borran de inmediato tu perfil, WODs, resultados, PRs, programas y evaluaciones. No hay forma de recuperarlos."
+      >
+        <form onSubmit={handleDelete} noValidate className="flex flex-col gap-4">
+          <TextField
+            label="Escribe ELIMINAR para confirmar"
+            type="text"
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            value={deleteText}
+            onChange={(e) => {
+              setDeleteText(e.target.value);
+              setDeleteError(null);
+            }}
+          />
+          {deleteError && (
+            <p role="alert" className="flex items-start gap-2 rounded-2xl bg-accent-soft p-3 text-sm text-accent">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              {deleteError}
+            </p>
+          )}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={closeDelete} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button type="submit" variant="primary" loading={deleting} disabled={!canDelete}>
+              Eliminar mi cuenta
+            </Button>
+          </div>
+        </form>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmSignOut}

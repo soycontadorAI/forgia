@@ -247,6 +247,17 @@ sube el `experience_level` del perfil.
 
 ---
 
+### DELETE /api/account
+
+Elimina la cuenta del usuario autenticado y todos sus datos (requisito de App
+Store 5.1.1(v)). Llama a la función `delete_own_account()`, que borra la fila
+de `auth.users`; todas las tablas de `public` caen en cascada. Sin rate limit.
+
+**Body**: `{ "confirm": "ELIMINAR" }` (cualquier otro valor → 400).
+
+**200**: `{ "deleted": true }`. Con cookie, la respuesta también limpia la
+sesión; un cliente nativo debe descartar sus tokens.
+
 ## Datos de sesión para HealthKit
 
 `workout_feedback` (escrito vía Supabase directo) incluye desde la Fase 2:

@@ -78,6 +78,9 @@ export default function PrivacidadPage() {
       <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed mb-4">
         Responderemos a su solicitud en un plazo máximo de 20 días hábiles.
       </p>
+      <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed mb-4">
+        También puede eliminar su cuenta en cualquier momento desde la aplicación, en <strong>Cuenta → Eliminar cuenta</strong>. La eliminación es inmediata y borra su perfil, entrenamientos, resultados, récords y programas de forma permanente.
+      </p>
 
       <h2 className="text-xl md:text-2xl font-semibold mt-10 mb-4 text-neutral-900 dark:text-neutral-100">
         6. Uso de cookies y almacenamiento local
