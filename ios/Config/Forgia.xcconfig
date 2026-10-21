@@ -1,0 +1,5 @@
+// Valores públicos de la app. La llave anon de Supabase es pública por diseño
+// (la misma que usa la web); los datos los protege RLS.
+// Las URL llevan "/$()/" porque xcconfig trata "//" como comentario.
+FORGIA_API_BASE_URL = https:/$()/forgia.fit
+#include? "Secrets.xcconfig"
