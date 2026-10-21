@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client';
 import type { Wod, SavedWod, WorkoutFeedback, WorkoutFeedbackInput } from '@/types/wod';
+import { notifyResultSaved } from '@/lib/consistency';
 
 export async function saveWod(userId: string, wod: Wod): Promise<SavedWod> {
   const supabase = createClient();
@@ -84,6 +85,7 @@ export async function saveFeedback(userId: string, input: WorkoutFeedbackInput):
     .single();
 
   if (error) throw new Error(`Error al guardar resultado: ${error.message}`);
+  notifyResultSaved();
   return data as WorkoutFeedback;
 }
 

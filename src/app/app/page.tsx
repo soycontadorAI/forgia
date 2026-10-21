@@ -14,6 +14,7 @@ import CopyWodButton from '@/components/CopyWodButton';
 import PrintWodButton from '@/components/PrintWodButton';
 import TrainingIntelligenceCard from '@/components/TrainingIntelligenceCard';
 import ProgramBanner from '@/components/ProgramBanner';
+import WeekStrip from '@/components/WeekStrip';
 import { Button, IconButton } from '@/components/ui/Button';
 import { TextAreaField } from '@/components/ui/Field';
 import { trackWodGenerated, trackWodSaved, trackWorkoutStarted } from '@/lib/analytics';
@@ -229,6 +230,8 @@ export default function AppPage() {
           {name ? `, ${name}` : ''}
         </h1>
       </div>
+
+      <WeekStrip />
 
       <TrainingIntelligenceCard />
 
