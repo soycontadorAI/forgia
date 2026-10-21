@@ -7,7 +7,7 @@ import WodDisplay from '@/components/WodDisplay';
 import CopyWodButton from '@/components/CopyWodButton';
 import PrintWodButton from '@/components/PrintWodButton';
 import Spinner from '@/components/Spinner';
-import { Flame, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Flame, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 interface CalendarViewProps {
   savedWods: SavedWod[];
@@ -283,9 +283,10 @@ export default function CalendarView({
                       <PrintWodButton />
                       <button
                         onClick={() => onDelete(saved.id)}
-                        className="text-sm text-red-500 hover:text-red-600 font-medium transition-colors"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-accent transition-colors hover:bg-accent-soft"
                       >
-                        Eliminar
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        Borrar
                       </button>
                     </div>
                   </div>

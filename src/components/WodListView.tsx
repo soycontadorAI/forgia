@@ -6,6 +6,7 @@ import WodDisplay from '@/components/WodDisplay';
 import CopyWodButton from '@/components/CopyWodButton';
 import PrintWodButton from '@/components/PrintWodButton';
 import Spinner from '@/components/Spinner';
+import { ChevronDown, ChevronRight, StickyNote, Trash2 } from 'lucide-react';
 
 interface WodListViewProps {
   savedWods: SavedWod[];
@@ -17,26 +18,10 @@ interface WodListViewProps {
   wodsWithFeedback: Set<string>;
 }
 
-// --- SVG Icons ---
-
-const ChevronRightIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-400 shrink-0">
-    <polyline points="9 18 15 12 9 6" />
-  </svg>
-);
-
-const ChevronDownIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-400 rotate-180 transition-transform duration-300 shrink-0">
-    <polyline points="6 9 12 15 18 9" />
-  </svg>
-);
-
-const StickyNoteIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-400 shrink-0 mt-0.5">
-    <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z" />
-    <path d="M15 3v4a2 2 0 0 0 2 2h4" />
-  </svg>
-);
+// Íconos (Lucide)
+const ChevronRightIcon = () => <ChevronRight className="h-5 w-5 shrink-0 text-muted" aria-hidden="true" />;
+const ChevronDownIcon = () => <ChevronDown className="h-5 w-5 shrink-0 rotate-180 text-muted transition-transform duration-300" aria-hidden="true" />;
+const StickyNoteIcon = () => <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />;
 
 // --- Helpers ---
 
@@ -92,14 +77,15 @@ export default function WodListView({
         return (
           <div
             key={saved.id}
-            className={`bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 overflow-hidden transition-all duration-300 ${
-              isExpanded ? 'shadow-lg' : 'hover:border-neutral-300 dark:hover:border-neutral-600'
+            className={`overflow-hidden rounded-3xl bg-surface transition-all duration-300 ${
+              isExpanded ? 'ring-1 ring-line' : 'hover:bg-raised/60'
             } ${!isExpanded ? 'print:hidden' : ''}`}
           >
             {/* Header row */}
             <button
               data-print-hide
               onClick={() => onExpand(saved.id)}
+              aria-expanded={isExpanded}
               className="w-full p-4 flex items-center justify-between text-left"
             >
               <div className="flex gap-4 items-center">
@@ -216,9 +202,10 @@ export default function WodListView({
                     <PrintWodButton />
                     <button
                       onClick={() => onDelete(saved.id)}
-                      className="text-sm text-red-500 hover:text-red-600 font-medium transition-colors"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-accent transition-colors hover:bg-accent-soft"
                     >
-                      Eliminar
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      Borrar
                     </button>
                   </div>
                 </div>
