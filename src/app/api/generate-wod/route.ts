@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { GoogleGenAI, Type } from '@google/genai';
 import { z } from 'zod';
+import { generateStructured, isAIConfigured, isTransientAIError, systemBlocks } from '@/lib/ai/claude';
+import { wodSchema } from '@/lib/ai/schemas';
 import { requireUser, rateLimitHeaders } from '@/lib/api-auth';
 import { parseJsonBody } from '@/lib/api-validation';
 import { trackUsage } from '@/lib/rate-limit';
@@ -111,17 +112,22 @@ function buildPRContext(records: PRRecord[]): string {
 
 // --- Prompt builders ---
 
-function buildSystemInstruction(profile: Profile, feedbackContext?: string, periodizationContext?: string, programContext?: string, prContext?: string): string {
+// El system prompt va de lo estable a lo variable (reglas → perfil → historial)
+// para que el prefijo se reutilice con prompt caching al regenerar el WOD.
+function buildSystemInstruction(profile: Profile, feedbackContext?: string, periodizationContext?: string, programContext?: string, prContext?: string): string[] {
   const sections = [
     `Eres un coach de CrossFit certificado de nivel elite con más de 15 años de experiencia. Tu especialidad es crear entrenamientos personalizados que se adaptan al perfil único de cada atleta.
 
 REGLAS ESTRICTAS:
 - Todo el contenido DEBE estar en español.
-- Los pesos se expresan en ${profile.weight_unit === 'kg' ? 'kilogramos (kg)' : 'libras (lbs)'}. ${buildWeightNotation(profile)}. Las distancias en metros (m).
 - Cada WOD debe ser único, variado, y no repetir patrones obvios.
 - El WOD debe ser realista y ejecutable en una sesión de 45-60 minutos.
 - Siempre incluir opciones de escalado en las notas cuando sea apropiado.
-- Los nombres de ejercicios pueden estar en inglés cuando son términos técnicos universales (Clean & Jerk, Snatch, Muscle-up, etc.), pero las instrucciones y descripciones deben estar en español.
+- Los nombres de ejercicios pueden estar en inglés cuando son términos técnicos universales (Clean & Jerk, Snatch, Muscle-up, etc.), pero las instrucciones y descripciones deben estar en español.`,
+
+    `UNIDADES Y NOTACIÓN:
+- Los pesos se expresan en ${profile.weight_unit === 'kg' ? 'kilogramos (kg)' : 'libras (lbs)'}. ${buildWeightNotation(profile)}. Las distancias en metros (m).
+- Cada movimiento del metcon lleva repeticiones y peso cuando aplica, ej. ${buildMovementExample(profile)}, 'Burpee Box Jump Overs (60/50 cm)'.
 
 PERFIL DEL ATLETA:
 - Nombre: ${profile.display_name || 'Atleta'}
@@ -147,7 +153,14 @@ PERFIL DEL ATLETA:
     prContext || '',
   ];
 
-  return sections.filter(Boolean).join('\n\n');
+  return sections.filter(Boolean);
+}
+
+function buildMovementExample(profile: Profile): string {
+  const kg = profile.weight_unit === 'kg';
+  if (profile.gender === 'hombre') return kg ? "'Peso Muerto (102 kg)'" : "'Peso Muerto (225 lbs)'";
+  if (profile.gender === 'mujer') return kg ? "'Peso Muerto (70 kg)'" : "'Peso Muerto (155 lbs)'";
+  return kg ? "'Peso Muerto (102/70 kg)'" : "'Peso Muerto (225/155 lbs)'";
 }
 
 function buildWeightNotation(profile: Profile): string {
@@ -349,7 +362,7 @@ function buildUserPrompt(sessionNotes: string): string {
 // --- API Route ---
 
 export async function POST(request: NextRequest) {
-  if (!process.env.GEMINI_API_KEY) {
+  if (!isAIConfigured()) {
     return NextResponse.json(
       { error: 'Error de configuración del servidor: falta la clave de API.' },
       { status: 500 }
@@ -473,81 +486,25 @@ export async function POST(request: NextRequest) {
   const systemInstruction = buildSystemInstruction(typedProfile, feedbackContext, periodizationContext, programContext, prContext);
   const userPrompt = buildUserPrompt(sessionNotes);
 
-  // Gemini schema (same structure as before)
-  const wodSchema = {
-    type: Type.OBJECT,
-    properties: {
-      title: { type: Type.STRING, description: "Un nombre temático y pegadizo para todo el WOD, ej. 'La Forja', 'Furia de Titanes'." },
-      warmUp: {
-        type: Type.OBJECT,
-        description: 'Una rutina de calentamiento completa.',
-        properties: {
-          title: { type: Type.STRING, description: "Debe ser 'Calentamiento'" },
-          duration: { type: Type.STRING, description: "Duración estimada, ej. '10-15 minutos'." },
-          parts: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Lista de movimientos y ejercicios de calentamiento.' },
-        },
-        required: ['title', 'duration', 'parts'],
-      },
-      strengthSkill: {
-        type: Type.OBJECT,
-        description: 'Una parte de desarrollo de fuerza o habilidad.',
-        properties: {
-          title: { type: Type.STRING, description: "Título para esta sección, ej. 'Fuerza: Back Squat' o 'Habilidad: Práctica de Handstand Walk'." },
-          details: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Series, repeticiones y porcentajes específicos, ej. '5x5 Back Squat @ 75% 1RM'." },
-        },
-        required: ['title', 'details'],
-      },
-      metcon: {
-        type: Type.OBJECT,
-        description: 'El entrenamiento principal de acondicionamiento metabólico.',
-        properties: {
-          title: { type: Type.STRING, description: "Debe ser 'Metcon'" },
-          type: { type: Type.STRING, description: "Tipo de entrenamiento: 'AMRAP', 'For Time', 'EMOM', 'Tabata', etc." },
-          description: { type: Type.STRING, description: "Una descripción concisa de la estructura del metcon, ej. '21-15-9 reps de:' o 'AMRAP en 20 minutos:'." },
-          movements: { type: Type.ARRAY, items: { type: Type.STRING }, description: `Lista de movimientos con repeticiones/pesos, ej. ${typedProfile.gender === 'hombre' ? (typedProfile.weight_unit === 'kg' ? "'Peso Muerto (102 kg)'" : "'Peso Muerto (225 lbs)'") : typedProfile.gender === 'mujer' ? (typedProfile.weight_unit === 'kg' ? "'Peso Muerto (70 kg)'" : "'Peso Muerto (155 lbs)'") : (typedProfile.weight_unit === 'kg' ? "'Peso Muerto (102/70 kg)'" : "'Peso Muerto (225/155 lbs)'")}, 'Burpee Box Jump Overs (60/50 cm)'.` },
-          notes: { type: Type.STRING, description: 'Notas opcionales, opciones de escalado o límites de tiempo.' },
-        },
-        required: ['title', 'type', 'description', 'movements'],
-      },
-      coolDown: {
-        type: Type.OBJECT,
-        description: 'Una rutina de enfriamiento y movilidad.',
-        properties: {
-          title: { type: Type.STRING, description: "Debe ser 'Enfriamiento'" },
-          duration: { type: Type.STRING, description: "Duración estimada, ej. '5-10 minutos'." },
-          parts: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Lista de estiramientos y ejercicios de movilidad.' },
-        },
-        required: ['title', 'duration', 'parts'],
-      },
-    },
-    required: ['title', 'warmUp', 'strengthSkill', 'metcon', 'coolDown'],
-  };
-
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: userPrompt,
-      config: {
-        systemInstruction,
-        responseMimeType: 'application/json',
-        responseSchema: wodSchema,
-      },
+    const wodData = await generateStructured({
+      // Caché del system prompt: regenerar con una nota reutiliza el mismo prefijo
+      system: systemBlocks(systemInstruction, true),
+      user: userPrompt,
+      schema: wodSchema,
+      effort: 'medium',
     });
 
-    let jsonString = response.text!.trim();
-
-    const jsonMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch && jsonMatch[1]) {
-      jsonString = jsonMatch[1];
-    }
-
-    const wodData = JSON.parse(jsonString);
     after(() => trackUsage(supabase, user.id, 'generate_wod'));
     return NextResponse.json(wodData, { headers: rateLimitHeaders(auth.rateLimit) });
   } catch (error) {
     console.error('Error al generar el WOD:', error);
+    if (isTransientAIError(error)) {
+      return NextResponse.json(
+        { error: 'El servicio de IA está temporalmente ocupado. Intenta de nuevo en unos segundos.' },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: 'No se pudo generar el WOD. Intenta de nuevo.' },
       { status: 500 }

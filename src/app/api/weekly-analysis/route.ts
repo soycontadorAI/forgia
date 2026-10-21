@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { GoogleGenAI, Type } from '@google/genai';
 import { requireUser, rateLimitHeaders, rateLimitExceededResponse } from '@/lib/api-auth';
 import { checkRateLimit, trackUsage } from '@/lib/rate-limit';
+import { generateStructured, isAIConfigured, systemBlocks } from '@/lib/ai/claude';
+import { weeklyAnalysisSchema } from '@/lib/ai/schemas';
 import type { Profile } from '@/types/profile';
 import type { WeeklyAnalysisData, WeeklyAnalysisResponse } from '@/types/weekly-analysis';
 
@@ -85,22 +86,8 @@ function buildUserPrompt(feedbackRecords: FeedbackRow[]): string {
   return lines.join('\n');
 }
 
-const weeklyAnalysisSchema = {
-  type: Type.OBJECT,
-  properties: {
-    resumen_semanal: { type: Type.STRING, description: 'Resumen general de la semana de entrenamiento (2-3 oraciones).' },
-    logros: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Logros destacados de la semana (2-4 puntos).' },
-    tendencias: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Tendencias observadas en los entrenamientos (2-3 puntos).' },
-    areas_atencion: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Áreas que necesitan atención o mejora (2-3 puntos).' },
-    recomendaciones_proxima_semana: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Recomendaciones concretas para la próxima semana (2-4 puntos).' },
-    carga_percibida: { type: Type.STRING, description: "Nivel de carga percibida de la semana: 'baja', 'moderada', 'alta', 'excesiva'." },
-    nota_motivacional: { type: Type.STRING, description: 'Una nota motivacional personalizada para el atleta (1-2 oraciones).' },
-  },
-  required: ['resumen_semanal', 'logros', 'tendencias', 'areas_atencion', 'recomendaciones_proxima_semana', 'carga_percibida', 'nota_motivacional'],
-};
-
 export async function GET(request: NextRequest) {
-  if (!process.env.GEMINI_API_KEY) {
+  if (!isAIConfigured()) {
     return NextResponse.json(
       { feedbackCount: 0, analysis: null, error: 'Falta la clave de API.' } as unknown as WeeklyAnalysisResponse,
       { status: 500 }
@@ -162,25 +149,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const profile = profileResult.data as Profile;
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: buildUserPrompt(feedbackRecords),
-      config: {
-        systemInstruction: buildSystemInstruction(profile),
-        responseMimeType: 'application/json',
-        responseSchema: weeklyAnalysisSchema,
-      },
+    const analysis: WeeklyAnalysisData = await generateStructured({
+      system: systemBlocks([buildSystemInstruction(profile)]),
+      user: buildUserPrompt(feedbackRecords),
+      schema: weeklyAnalysisSchema,
+      effort: 'low',
     });
-
-    let jsonString = response.text!.trim();
-    const jsonMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch && jsonMatch[1]) {
-      jsonString = jsonMatch[1];
-    }
-
-    const analysis = JSON.parse(jsonString);
 
     if (cacheAvailable) {
       const { error: upsertError } = await supabase

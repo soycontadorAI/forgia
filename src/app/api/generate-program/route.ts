@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { GoogleGenAI, Type } from '@google/genai';
 import { requireUser, rateLimitHeaders } from '@/lib/api-auth';
 import { trackUsage } from '@/lib/rate-limit';
+import { generateStructured, isAIConfigured, isTransientAIError, systemBlocks } from '@/lib/ai/claude';
+import { programSchema } from '@/lib/ai/schemas';
 import type { Profile } from '@/types/profile';
 import type { ProgramWeek } from '@/types/program';
 
@@ -44,42 +45,8 @@ TIPOS DE SESIÓN VÁLIDOS:
 Genera el programa completo en formato JSON.`;
 }
 
-const programSchema = {
-  type: Type.OBJECT,
-  properties: {
-    weeks: {
-      type: Type.ARRAY,
-      description: 'Las 4 semanas del programa',
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          number: { type: Type.INTEGER, description: 'Número de semana (1-4)' },
-          focus: { type: Type.STRING, description: "Enfoque general de la semana, ej. 'Base / Adaptación', 'Volumen', 'Intensidad', 'Deload'" },
-          skillFocus: { type: Type.STRING, description: "Habilidad específica a trabajar esta semana, ej. 'Kipping Pull-ups', 'Double Unders', 'Pistol Squat progressions'" },
-          sessions: {
-            type: Type.ARRAY,
-            description: 'Sesiones de la semana (cantidad = frecuencia de entrenamiento)',
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                order: { type: Type.INTEGER, description: 'Número de sesión en la semana (1, 2, 3...)' },
-                type: { type: Type.STRING, description: "Tipo de sesión: 'Fuerza', 'Metcon', 'Skill + Metcon', 'Cardio', 'Mixto', 'Accesorios'" },
-                emphasis: { type: Type.STRING, description: "Descripción breve del enfoque, ej. 'Back Squat + Strict Press', 'AMRAP 15 min - couplet', 'Row intervals + core'" },
-                intensity: { type: Type.STRING, description: "Intensidad: 'baja', 'moderada', 'alta', 'muy alta'" },
-              },
-              required: ['order', 'type', 'emphasis', 'intensity'],
-            },
-          },
-        },
-        required: ['number', 'focus', 'skillFocus', 'sessions'],
-      },
-    },
-  },
-  required: ['weeks'],
-};
-
 export async function POST(request: NextRequest) {
-  if (!process.env.GEMINI_API_KEY) {
+  if (!isAIConfigured()) {
     return NextResponse.json(
       { error: 'Error de configuración del servidor: falta la clave de API.' },
       { status: 500 }
@@ -110,26 +77,13 @@ export async function POST(request: NextRequest) {
   const prompt = buildProgramPrompt(typedProfile);
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: 'Genera el programa de 4 semanas para este atleta.',
-      config: {
-        systemInstruction: prompt,
-        responseMimeType: 'application/json',
-        responseSchema: programSchema,
-      },
+    const programData = await generateStructured({
+      system: systemBlocks([prompt]),
+      user: 'Genera el programa de 4 semanas para este atleta.',
+      schema: programSchema,
+      effort: 'medium',
     });
-
-    let jsonString = response.text!.trim();
-    const jsonMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch && jsonMatch[1]) {
-      jsonString = jsonMatch[1];
-    }
-
-    const programData = JSON.parse(jsonString);
-    const weeks = programData.weeks as ProgramWeek[];
+    const weeks: ProgramWeek[] = programData.weeks;
 
     // Save to DB
     const now = new Date();
@@ -172,6 +126,12 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error('Error al generar programa:', error);
+    if (isTransientAIError(error)) {
+      return NextResponse.json(
+        { error: 'El servicio de IA está temporalmente ocupado. Intenta de nuevo en unos segundos.' },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: 'No se pudo generar el programa. Intenta de nuevo más tarde.' },
       { status: 500 }

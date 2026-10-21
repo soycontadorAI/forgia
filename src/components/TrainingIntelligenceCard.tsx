@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { fetchTrainingIntelligence } from '@/lib/gemini';
+import { fetchTrainingIntelligence } from '@/lib/ai-client';
 import type { TrainingIntelligenceResponse } from '@/app/api/training-intelligence/route';
 
 const PHASE_LABELS: Record<string, string> = {

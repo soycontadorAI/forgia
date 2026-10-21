@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useChatContext } from '@/contexts/ChatContext';
-import { sendChatMessage } from '@/lib/gemini';
+import { sendChatMessage } from '@/lib/ai-client';
 import { trackChatOpened, trackChatMessageSent } from '@/lib/analytics';
 import type { ChatMessage, ChatHistoryEntry } from '@/types/chat';
 import ChatPanel from './ChatPanel';
