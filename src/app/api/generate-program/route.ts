@@ -3,47 +3,9 @@ import { requireUser, rateLimitHeaders } from '@/lib/api-auth';
 import { trackUsage } from '@/lib/rate-limit';
 import { AI_MODELS, generateStructured, isAIConfigured, isTransientAIError, systemBlocks } from '@/lib/ai/claude';
 import { programSchema } from '@/lib/ai/schemas';
+import { PROGRAM_BASE_INSTRUCTIONS, buildProgramContext } from '@/lib/ai/prompts/program';
 import type { Profile } from '@/types/profile';
 import type { ProgramWeek } from '@/types/program';
-
-function buildProgramPrompt(profile: Profile): string {
-  const frequency = profile.training_frequency ?? 4;
-  const objectives = profile.objectives?.join(', ') || 'General fitness';
-
-  return `Eres un coach de CrossFit certificado de nivel elite con más de 15 años de experiencia diseñando mesociclos de entrenamiento periodizado.
-
-Genera un programa de 4 semanas (mesociclo) para este atleta.
-
-PERFIL DEL ATLETA:
-- Nombre: ${profile.display_name || 'Atleta'}
-- Edad: ${profile.age ? `${profile.age} años` : 'No especificada'}
-- Nivel: ${profile.experience_level || 'Intermedio'}
-- Objetivos: ${objectives}
-- Equipamiento: ${profile.equipment_level || 'Box completo'}
-- Frecuencia: ${frequency} días/semana
-- Lesiones: ${profile.injury_history?.trim() || 'Ninguna'}
-
-REGLAS DEL MESOCICLO:
-- Cada semana DEBE tener exactamente ${frequency} sesiones.
-- Progresión lógica: Semana 1 = Base/Adaptación, Semana 2 = Volumen, Semana 3 = Intensidad, Semana 4 = Deload (reducir volumen e intensidad 40-50%).
-- Variar los tipos de sesión dentro de cada semana (no repetir el mismo tipo dos días seguidos).
-- El skill focus semanal debe ser un movimiento específico apropiado al nivel del atleta.
-- ${profile.experience_level === 'Novato' ? 'Para nivel Novato: skill focus debe ser movimientos fundamentales (air squat, push-up, plank). No incluir halterofilia ni gimnásticos.' : ''}
-- ${profile.experience_level === 'Principiante' ? 'Para nivel Principiante: skill focus debe ser movimientos básicos (pull-ups, front squat, KB swings). Evitar movimientos complejos.' : ''}
-- ${objectives.includes('Preparación HYROX') ? 'Incluir al menos 1-2 sesiones semanales de running + estaciones funcionales HYROX.' : ''}
-- Las intensidades deben ser realistas para el nivel del atleta.
-- Todo el contenido DEBE estar en español.
-
-TIPOS DE SESIÓN VÁLIDOS:
-- "Fuerza" — Trabajo pesado con barra/mancuernas, series bajas repeticiones
-- "Metcon" — Acondicionamiento metabólico (AMRAP, For Time, EMOM)
-- "Skill + Metcon" — Práctica de habilidad + metcon corto
-- "Cardio" — Trabajo aeróbico, intervalos, running
-- "Mixto" — Combinación de fuerza moderada + metcon
-- "Accesorios" — Trabajo complementario, core, movilidad
-
-Genera el programa completo en formato JSON.`;
-}
 
 export async function POST(request: NextRequest) {
   if (!isAIConfigured()) {
@@ -74,12 +36,13 @@ export async function POST(request: NextRequest) {
   }
 
   const typedProfile = profile as Profile;
-  const prompt = buildProgramPrompt(typedProfile);
+  const athleteContext = buildProgramContext(typedProfile);
 
   try {
     const programData = await generateStructured({
+      route: 'generate-program',
       model: AI_MODELS.program,
-      system: systemBlocks([prompt]),
+      system: systemBlocks([PROGRAM_BASE_INSTRUCTIONS, athleteContext]),
       user: 'Genera el programa de 4 semanas para este atleta.',
       schema: programSchema,
       effort: 'medium',

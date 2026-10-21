@@ -99,7 +99,13 @@ Components in `src/components/live/` provide a full-screen timer overlay with au
 
 ### Security
 - All AI-calling API routes (`/api/generate-*`, `/api/weekly-analysis`, `/api/assessments/*`) must import and call `checkRateLimit` from `@/lib/rate-limit`
-- User-supplied text (sessionNotes, form inputs) must be sanitized before embedding in AI prompts: `.slice(0, 500).replace(/[<>{}]/g, '')` + delimiter wrapping
+- User-supplied text (session notes, chat messages, injury history, feedback notes, names, the client-sent WOD) must go through `sanitizeUserText` and be wrapped with `xmlBlock` from `@/lib/ai/prompt` before entering an AI prompt
+
+### AI prompts
+- Prompt builders live in `src/lib/ai/prompts/*`; routes only assemble data and call `generateStructured` / `openTextStream` from `@/lib/ai/claude`
+- System prompts go stable-to-variable: a base-instructions constant identical for every user first, then per-user context in XML tags. Never interpolate per-request values (dates, IDs) into the base block — it breaks prompt caching
+- Write instructions plainly with the reason behind them; no all-caps pressure words (`MUST`, `NUNCA`, `DIRECTIVA`). Output format is enforced by the Zod schema, not by prose
+- Each call logs an `ai_usage` JSON line (tokens, cache reads/writes) — check it in Vercel logs before changing caching or models
 - API route error responses must NEVER include `error.message` — log internally, return a generic Spanish message to the client
 - Auth callback (`/auth/callback`) must validate redirect paths and OTP types against allowlists
 - `next.config.ts` must include security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy

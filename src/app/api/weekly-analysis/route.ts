@@ -3,17 +3,15 @@ import { requireUser, rateLimitHeaders, rateLimitExceededResponse } from '@/lib/
 import { checkRateLimit, trackUsage } from '@/lib/rate-limit';
 import { AI_MODELS, generateStructured, isAIConfigured, systemBlocks } from '@/lib/ai/claude';
 import { weeklyAnalysisSchema } from '@/lib/ai/schemas';
+import {
+  WEEKLY_BASE_INSTRUCTIONS,
+  buildAthleteContext,
+  buildUserPrompt,
+  type FeedbackRow,
+} from '@/lib/ai/prompts/weekly-analysis';
 import type { Profile } from '@/types/profile';
 import type { WeeklyAnalysisData, WeeklyAnalysisResponse } from '@/types/weekly-analysis';
 
-interface FeedbackRow {
-  difficulty_rating: number;
-  total_time_minutes: number | null;
-  rx_or_scaled: string;
-  notes: string | null;
-  wod_snapshot: { title: string; metcon: { type?: string; movements?: string[] } };
-  created_at: string;
-}
 
 function getWeekStart(): Date {
   const now = new Date();
@@ -36,54 +34,6 @@ function toDateKey(date: Date): string {
 interface CachedAnalysisRow {
   feedback_count: number;
   analysis: WeeklyAnalysisData;
-}
-
-function buildSystemInstruction(profile: Profile): string {
-  return `Eres un coach de CrossFit certificado de nivel elite con más de 15 años de experiencia analizando el rendimiento de atletas.
-
-Tu tarea es analizar el feedback acumulado de una semana de entrenamiento y proporcionar un resumen útil, actionable y motivacional.
-
-PERFIL DEL ATLETA:
-- Nombre: ${profile.display_name || 'Atleta'}
-- Edad: ${profile.age ? `${profile.age} años` : 'No especificada'}
-- Nivel: ${profile.experience_level || 'Intermedio'}
-- Objetivos: ${profile.objectives?.join(', ') || 'General fitness'}
-- Equipamiento: ${profile.equipment_level || 'No especificado'}
-
-REGLAS:
-- Todo el contenido DEBE estar en español.
-- Sé específico y actionable en las recomendaciones.
-- Adapta el tono al nivel del atleta (más pedagógico para Novato/Principiante, más técnico para Intermedio/Avanzado).
-- Los logros deben ser concretos y basados en los datos proporcionados.
-- Las tendencias deben identificar patrones reales en los datos.
-- La nota motivacional debe ser personalizada, no genérica.`;
-}
-
-function buildUserPrompt(feedbackRecords: FeedbackRow[]): string {
-  const lines = [
-    `Analiza los siguientes ${feedbackRecords.length} entrenamientos de esta semana:\n`,
-  ];
-
-  for (const f of feedbackRecords) {
-    const date = new Date(f.created_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric' });
-    const movements = f.wod_snapshot.metcon?.movements?.join(', ') || 'N/A';
-    lines.push(`${date}: "${f.wod_snapshot.title}" — ${f.wod_snapshot.metcon?.type || 'WOD'}`);
-    lines.push(`  Dificultad: ${f.difficulty_rating}/10, ${f.rx_or_scaled}${f.total_time_minutes ? `, ${f.total_time_minutes} min` : ''}`);
-    lines.push(`  Movimientos: ${movements}`);
-    if (f.notes) lines.push(`  Notas del atleta: "${f.notes}"`);
-    lines.push('');
-  }
-
-  const avgDifficulty = feedbackRecords.reduce((sum, f) => sum + f.difficulty_rating, 0) / feedbackRecords.length;
-  const scaledCount = feedbackRecords.filter((f) => f.rx_or_scaled === 'Scaled').length;
-
-  lines.push(`RESUMEN NUMÉRICO:`);
-  lines.push(`- Total sesiones: ${feedbackRecords.length}`);
-  lines.push(`- Dificultad promedio: ${avgDifficulty.toFixed(1)}/10`);
-  lines.push(`- Rx: ${feedbackRecords.length - scaledCount}, Scaled: ${scaledCount}`);
-  lines.push(`\nGenera el análisis semanal completo.`);
-
-  return lines.join('\n');
 }
 
 export async function GET(request: NextRequest) {
@@ -150,8 +100,9 @@ export async function GET(request: NextRequest) {
   try {
     const profile = profileResult.data as Profile;
     const analysis: WeeklyAnalysisData = await generateStructured({
+      route: 'weekly-analysis',
       model: AI_MODELS.weeklyAnalysis,
-      system: systemBlocks([buildSystemInstruction(profile)]),
+      system: systemBlocks([WEEKLY_BASE_INSTRUCTIONS, buildAthleteContext(profile)]),
       user: buildUserPrompt(feedbackRecords),
       schema: weeklyAnalysisSchema,
       effort: 'low',

@@ -56,20 +56,41 @@ export function isTransientAIError(error: unknown): boolean {
 export type SystemBlocks = Anthropic.Beta.Messages.BetaTextBlockParam[];
 
 /**
- * Arma el system prompt como bloques: primero lo estable, al final lo
- * variable. `cache` marca el último bloque para prompt caching.
+ * Arma el system prompt como bloques, de lo estable a lo variable.
+ * - 'each': un breakpoint de caché por bloque (prefijo compartido entre
+ *   usuarios + contexto del usuario).
+ * - 'last': solo el bloque final (se reutiliza al repetir la misma petición).
+ * - 'none': sin caché, para prompts de una sola vez donde la escritura no se
+ *   volvería a leer.
  */
-export function systemBlocks(parts: string[], cache = false): SystemBlocks {
-  const blocks: SystemBlocks = parts
-    .filter(Boolean)
-    .map((text) => ({ type: 'text' as const, text }));
-  if (cache && blocks.length > 0) {
-    blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: 'ephemeral' } };
-  }
-  return blocks;
+export function systemBlocks(parts: string[], cache: 'each' | 'last' | 'none' = 'none'): SystemBlocks {
+  const texts = parts.filter(Boolean);
+  return texts.map((text, i) => {
+    const cached = cache === 'each' || (cache === 'last' && i === texts.length - 1);
+    return cached
+      ? { type: 'text' as const, text, cache_control: { type: 'ephemeral' as const } }
+      : { type: 'text' as const, text };
+  });
+}
+
+/** Una línea JSON por llamada en los logs, para medir costo y aciertos de caché. */
+function logUsage(route: string, model: string, usage: Anthropic.Beta.Messages.BetaUsage | undefined) {
+  if (!usage) return;
+  console.log(
+    JSON.stringify({
+      event: 'ai_usage',
+      route,
+      model,
+      input: usage.input_tokens,
+      output: usage.output_tokens,
+      cache_read: usage.cache_read_input_tokens ?? 0,
+      cache_write: usage.cache_creation_input_tokens ?? 0,
+    })
+  );
 }
 
 interface StructuredRequest<T extends z.ZodType> {
+  route: string;
   model: AIModel;
   system: SystemBlocks;
   user: string;
@@ -80,6 +101,7 @@ interface StructuredRequest<T extends z.ZodType> {
 
 /** Genera JSON validado contra el esquema Zod (structured outputs). */
 export async function generateStructured<T extends z.ZodType>({
+  route,
   model,
   system,
   user,
@@ -95,6 +117,7 @@ export async function generateStructured<T extends z.ZodType>({
     messages: [{ role: 'user', content: user }],
     output_config: { effort, format: betaZodOutputFormat(schema) },
   });
+  logUsage(route, model, response.usage);
 
   if (response.stop_reason !== 'end_turn' || response.parsed_output == null) {
     throw new AIIncompleteError(response.stop_reason);
@@ -103,6 +126,7 @@ export async function generateStructured<T extends z.ZodType>({
 }
 
 interface ChatStreamRequest {
+  route: string;
   model: AIModel;
   system: SystemBlocks;
   messages: Anthropic.Beta.Messages.BetaMessageParam[];
@@ -116,6 +140,7 @@ interface ChatStreamRequest {
  * responder con un status HTTP en lugar de un stream vacío.
  */
 export async function openTextStream({
+  route,
   model,
   system,
   messages,
@@ -145,6 +170,7 @@ export async function openTextStream({
         }
       };
       stream.on('text', (delta) => controller.enqueue(encoder.encode(delta)));
+      stream.on('finalMessage', (message) => logUsage(route, model, message.usage));
       stream.on('end', close);
       stream.on('error', (error) => {
         console.error('Error durante el stream de IA:', error);
