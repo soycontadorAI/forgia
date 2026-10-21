@@ -121,6 +121,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             <span className="flex items-center gap-1">
               <Calendar className="w-4 h-4" />
               {new Date(post.date).toLocaleDateString('es-MX', {
+              timeZone: 'UTC',
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',

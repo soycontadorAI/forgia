@@ -29,6 +29,7 @@ export default function BlogPostCard({ post }: { post: BlogPostMeta }) {
           <span className="flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5" />
             {new Date(post.date).toLocaleDateString('es-MX', {
+              timeZone: 'UTC',
               year: 'numeric',
               month: 'long',
               day: 'numeric',
