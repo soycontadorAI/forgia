@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, Settings, Trophy } from 'lucide-react';
+import { BarChart3, LogOut, Settings, Trophy } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import ThemeToggle from '@/components/ThemeToggle';
 import UserAvatar from '@/components/UserAvatar';
@@ -108,6 +108,12 @@ export default function AppHeader() {
                   <Settings className="h-4 w-4 text-muted" aria-hidden="true" />
                   Cuenta
                 </Link>
+                {profile?.role === 'admin' && (
+                  <Link href="/app/admin" role="menuitem" className={MENU_ITEM}>
+                    <BarChart3 className="h-4 w-4 text-muted" aria-hidden="true" />
+                    Métricas
+                  </Link>
+                )}
                 {isOpenSeasonActive() && (
                   <Link href="/app/open" role="menuitem" className={MENU_ITEM}>
                     <Trophy className="h-4 w-4 text-muted" aria-hidden="true" />
