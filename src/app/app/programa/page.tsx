@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import type { MonthlyProgram, ProgramWeek, ProgramSession } from '@/types/program';
 import { getActiveProgram, getWodCountThisWeek, getCurrentWeekNumber } from '@/lib/programs';
-import { generateProgram } from '@/lib/gemini';
+import { generateProgram } from '@/lib/ai-client';
 import Spinner from '@/components/Spinner';
 import WeeklyAnalysisSection from '@/components/WeeklyAnalysisSection';
 import LevelAssessmentCard from '@/components/LevelAssessmentCard';

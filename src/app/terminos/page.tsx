@@ -91,10 +91,10 @@ export default function TerminosPage() {
         7. Uso de inteligencia artificial
       </h2>
       <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed mb-4">
-        Forgia utiliza la API de Google Gemini para generar entrenamientos y analizar retroalimentación. Esto implica que:
+        Forgia utiliza la API de Claude, de Anthropic, para generar entrenamientos, analizar retroalimentación y responder en el Coach IA. Esto implica que:
       </p>
       <ul className="list-disc list-inside space-y-2 mb-4 text-neutral-700 dark:text-neutral-300">
-        <li>Los datos de su perfil se procesan y envían a servidores de Google para generar contenido</li>
+        <li>Los datos de su perfil se procesan y envían a servidores de Anthropic para generar contenido</li>
         <li>El contenido generado por IA puede contener imprecisiones o no ser óptimo para todos los usuarios</li>
         <li>La calidad de los entrenamientos depende en parte de la información que usted proporciona</li>
         <li>Los modelos de IA se actualizan periódicamente, lo que puede afectar el estilo de los entrenamientos</li>

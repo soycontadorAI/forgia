@@ -10,7 +10,7 @@
     "analyze": "ANALYZE=true next build"
   },
   "dependencies": {
-    "@google/genai": "^1.52.0",
+    "@anthropic-ai/sdk": "^0.137.0",
     "@next/third-parties": "^16.1.6",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.94.0",

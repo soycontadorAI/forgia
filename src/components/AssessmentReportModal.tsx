@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import type { AssessmentSelfReport, LevelAssessment } from '@/types/assessment';
 import type { BenchmarkWod } from '@/types/assessment';
-import { completeAssessment } from '@/lib/gemini';
+import { completeAssessment } from '@/lib/ai-client';
 import SegmentedButton from '@/components/ui/SegmentedButton';
 import Spinner from '@/components/Spinner';
 
