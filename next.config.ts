@@ -2,6 +2,14 @@ import type { NextConfig } from "next";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 
 const nextConfig: NextConfig = {
+  // Historia, Records y Programa ahora viven dentro de Progreso
+  async redirects() {
+    return [
+      { source: "/app/historia", destination: "/app/progreso/historia", permanent: true },
+      { source: "/app/records", destination: "/app/progreso/records", permanent: true },
+      { source: "/app/programa", destination: "/app/progreso/programa", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

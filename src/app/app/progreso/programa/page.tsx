@@ -6,7 +6,6 @@ import type { MonthlyProgram, ProgramWeek, ProgramSession } from '@/types/progra
 import { getActiveProgram, getWodCountThisWeek, getCurrentWeekNumber } from '@/lib/programs';
 import { generateProgram } from '@/lib/ai-client';
 import Spinner from '@/components/Spinner';
-import WeeklyAnalysisSection from '@/components/WeeklyAnalysisSection';
 import LevelAssessmentCard from '@/components/LevelAssessmentCard';
 
 // --- SVG Icons ---
@@ -212,9 +211,9 @@ export default function ProgramaPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">
+          <h2 className="text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">
             Programa Mensual
-          </h1>
+          </h2>
           <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1 capitalize">
             {monthName} {year}
           </p>
@@ -279,7 +278,6 @@ export default function ProgramaPage() {
       )}
 
       {/* Weekly analysis */}
-      {!generating && program && <WeeklyAnalysisSection />}
     </div>
   );
 }

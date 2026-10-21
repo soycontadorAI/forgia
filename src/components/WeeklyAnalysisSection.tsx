@@ -68,7 +68,7 @@ export default function WeeklyAnalysisSection() {
 
   if (loading) {
     return (
-      <div className="mt-8 pt-8 border-t border-neutral-200 dark:border-neutral-800">
+      <section>
         <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-red-500" />
           Análisis Semanal
@@ -76,13 +76,13 @@ export default function WeeklyAnalysisSection() {
         <div className="flex justify-center py-8">
           <Spinner />
         </div>
-      </div>
+      </section>
     );
   }
 
   if (error || feedbackCount === 0) {
     return (
-      <div className="mt-8 pt-8 border-t border-neutral-200 dark:border-neutral-800">
+      <section>
         <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-red-500" />
           Análisis Semanal
@@ -90,14 +90,14 @@ export default function WeeklyAnalysisSection() {
         <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center py-6">
           No hay feedback registrado esta semana. Registra tus resultados para obtener un análisis.
         </p>
-      </div>
+      </section>
     );
   }
 
   if (!analysis) return null;
 
   return (
-    <div className="mt-8 pt-8 border-t border-neutral-200 dark:border-neutral-800">
+    <section>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
@@ -155,6 +155,6 @@ export default function WeeklyAnalysisSection() {
           &ldquo;{analysis.nota_motivacional}&rdquo;
         </p>
       </div>
-    </div>
+    </section>
   );
 }

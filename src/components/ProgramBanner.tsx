@@ -71,7 +71,7 @@ export default function ProgramBanner() {
   if (!program) {
     return (
       <Link
-        href="/app/programa"
+        href="/app/progreso/programa"
         className="flex items-center justify-between gap-3 mb-6 p-4 rounded-xl border border-dashed border-neutral-300 dark:border-neutral-700 hover:border-red-500 dark:hover:border-red-500 transition-colors group"
       >
         <div className="flex items-center gap-3">
@@ -89,7 +89,7 @@ export default function ProgramBanner() {
 
   return (
     <Link
-      href="/app/programa"
+      href="/app/progreso/programa"
       className="block mb-6 p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-red-500/50 dark:hover:border-red-500/50 transition-colors bg-neutral-50 dark:bg-neutral-900/50"
     >
       <div className="flex items-start justify-between gap-3">

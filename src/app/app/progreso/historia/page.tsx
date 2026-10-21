@@ -83,7 +83,7 @@ export default function HistoriaPage() {
   return (
     <>
       <div data-print-hide className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">Historia</h1>
+        <h2 className="text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">Historia</h2>
         <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1">Tus WODs guardados</p>
       </div>
 
