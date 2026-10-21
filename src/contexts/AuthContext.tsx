@@ -15,11 +15,20 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({
+  children,
+  initialProfile,
+}: {
+  children: React.ReactNode;
+  /** Perfil leído en el servidor (layout de /app); evita el spinner inicial */
+  initialProfile?: Profile | null;
+}) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [profile, setProfile] = useState<Profile | null>(initialProfile ?? null);
+  const [isLoading, setIsLoading] = useState(initialProfile === undefined);
   const userRef = useRef<User | null>(null);
+  // El primer fetch del perfil sobra si el servidor ya lo mandó para ese usuario
+  const prefetchedProfileId = useRef<string | null>(initialProfile?.id ?? null);
 
   const fetchProfile = useCallback(async (userId: string) => {
     const supabase = createClient();
@@ -85,6 +94,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // by the time React processes the state update and runs this effect.
   useEffect(() => {
     if (!user) return;
+
+    if (prefetchedProfileId.current === user.id) {
+      prefetchedProfileId.current = null;
+      return;
+    }
 
     let cancelled = false;
 
