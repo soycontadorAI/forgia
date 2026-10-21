@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createClient as createCookieClient } from '@/lib/supabase/server';
 import { checkRateLimit, type RateLimitedAction, type RateLimitResult } from '@/lib/rate-limit';
+import { FREE_WEEKLY_WODS, PLAN_REQUIRED, startOfWeekMexico } from '@/lib/plans';
 
 const RATE_LIMIT_MESSAGES: Record<RateLimitedAction, string> = {
   generate_wod: 'Has alcanzado el límite diario de generación de WODs. Intenta de nuevo mañana.',
@@ -27,6 +28,15 @@ interface RequireUserOptions {
   authMessage?: string;
   /** Exige profiles.ai_consent_at: la ruta envía datos del usuario a Anthropic */
   aiConsent?: boolean;
+  /**
+   * 'paid': la función es del plan Básico.
+   * 'wod_quota': sin plan, hasta FREE_WEEKLY_WODS WODs por semana.
+   */
+  plan?: 'paid' | 'wod_quota';
+}
+
+function planRequired(error: string, extra: Record<string, unknown> = {}): NextResponse {
+  return NextResponse.json({ error, code: PLAN_REQUIRED, ...extra }, { status: 402 });
 }
 
 export const AI_CONSENT_REQUIRED = 'ai_consent_required';
@@ -90,6 +100,30 @@ export async function requireUser(
           { status: 403 }
         ),
       };
+    }
+  }
+
+  if (options.plan) {
+    const { data: paid } = await supabase.rpc('has_paid_plan');
+    if (!paid && options.plan === 'paid') {
+      return { ok: false, response: planRequired('Esta función es parte del plan Básico.') };
+    }
+    if (!paid && options.plan === 'wod_quota') {
+      const { count } = await supabase
+        .from('usage_tracking')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('action', 'generate_wod')
+        .gte('created_at', startOfWeekMexico().toISOString());
+      if ((count ?? 0) >= FREE_WEEKLY_WODS) {
+        return {
+          ok: false,
+          response: planRequired(
+            `Ya usaste tus ${FREE_WEEKLY_WODS} WODs gratis de esta semana. Con Básico son ilimitados.`,
+            { limit: FREE_WEEKLY_WODS }
+          ),
+        };
+      }
     }
   }
 

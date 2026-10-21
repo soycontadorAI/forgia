@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import type { WeeklyAnalysisData } from '@/types/weekly-analysis';
 import { fetchWeeklyAnalysis, requestAIConsent } from '@/lib/ai-client';
+import { PlanRequiredError } from '@/lib/billing';
+import { ButtonLink } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -56,6 +58,7 @@ export default function WeeklyAnalysisSection() {
   const [feedbackCount, setFeedbackCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [needsPlan, setNeedsPlan] = useState(false);
 
   useEffect(() => {
     // Sin permiso de IA no se pide el análisis: se ofrece activarlo
@@ -65,8 +68,9 @@ export default function WeeklyAnalysisSection() {
         const result = await fetchWeeklyAnalysis();
         setFeedbackCount(result.feedbackCount);
         setAnalysis(result.analysis);
-      } catch {
-        setError(true);
+      } catch (err) {
+        if (err instanceof PlanRequiredError) setNeedsPlan(true);
+        else setError(true);
       } finally {
         setLoading(false);
       }
@@ -84,6 +88,20 @@ export default function WeeklyAnalysisSection() {
         <Button variant="secondary" size="sm" className="self-start" onClick={requestAIConsent}>
           Activar el coach con IA
         </Button>
+      </Card>
+    );
+  }
+
+  if (needsPlan) {
+    return (
+      <Card className="flex flex-col gap-3">
+        <CoachHeader />
+        <p className="text-sm text-muted">
+          Cada semana tu coach revisa lo que entrenaste: logros, tendencias, carga y qué ajustar. Es parte del plan Básico.
+        </p>
+        <ButtonLink href="/app/planes" variant="secondary" size="sm" className="self-start">
+          Ver planes
+        </ButtonLink>
       </Card>
     );
   }

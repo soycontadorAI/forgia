@@ -15,6 +15,8 @@ import PrintWodButton from '@/components/PrintWodButton';
 import TrainingIntelligenceCard from '@/components/TrainingIntelligenceCard';
 import ProgramBanner from '@/components/ProgramBanner';
 import WeekStrip from '@/components/WeekStrip';
+import FreeWodsHint from '@/components/billing/FreeWodsHint';
+import { PlanRequiredError } from '@/lib/billing';
 import { Button, IconButton } from '@/components/ui/Button';
 import { TextAreaField } from '@/components/ui/Field';
 import { trackWodGenerated, trackWodSaved, trackWorkoutStarted } from '@/lib/analytics';
@@ -45,6 +47,7 @@ export default function AppPage() {
   const [wod, setWod] = useState<Wod | null>(null);
   const [partialWod, setPartialWod] = useState<PartialWod | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [generations, setGenerations] = useState(0);
   const [isLoadingLatest, setIsLoadingLatest] = useState(true);
   const [header, setHeader] = useState({ date: '', greeting: '' });
   const [sessionNotes, setSessionNotes] = useState('');
@@ -156,12 +159,13 @@ export default function AppPage() {
       setWod(newWod);
       trackWodGenerated(user?.email || 'unknown');
     } catch (err) {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || err instanceof PlanRequiredError) return;
       toast.error(err instanceof Error ? err.message : 'Ocurrió un error desconocido al generar el WOD.');
     } finally {
       if (!controller.signal.aborted) {
         setIsLoading(false);
         setPartialWod(null);
+        setGenerations((n) => n + 1);
       }
     }
   }, [sessionNotes, user]);
@@ -256,6 +260,7 @@ export default function AppPage() {
         >
           {isLoading ? 'Generando…' : wod ? 'Generar otro WOD' : 'Generar WOD'}
         </Button>
+        <FreeWodsHint refreshKey={generations} />
       </div>
 
       {/* Content area */}

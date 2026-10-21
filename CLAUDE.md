@@ -28,7 +28,9 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=...  # Web push (recordatorios)
 VAPID_PRIVATE_KEY=...             # Server-side only
 VAPID_SUBJECT=mailto:...
 CRON_SECRET=...                   # Bearer que manda pg_cron; igual al secreto 'push_cron_secret' en Vault
-SUPABASE_SERVICE_ROLE_KEY=...     # Sólo para /api/cron/* (src/lib/supabase/admin.ts)
+SUPABASE_SERVICE_ROLE_KEY=...     # Sólo para /api/cron/* y el webhook de Stripe (src/lib/supabase/admin.ts)
+STRIPE_SECRET_KEY=...             # Llave restringida de la cuenta Stripe "Forgia" (MXN)
+STRIPE_WEBHOOK_SECRET=...         # Firma de /api/stripe/webhook
 ```
 
 ## Tech Stack

@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, LogOut, Settings, Trophy } from 'lucide-react';
+import { BarChart3, Crown, LogOut, Settings, Trophy } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import ThemeToggle from '@/components/ThemeToggle';
 import UserAvatar from '@/components/UserAvatar';
@@ -107,6 +107,10 @@ export default function AppHeader() {
                 <Link href="/app/cuenta" role="menuitem" className={MENU_ITEM}>
                   <Settings className="h-4 w-4 text-muted" aria-hidden="true" />
                   Cuenta
+                </Link>
+                <Link href="/app/planes" role="menuitem" className={MENU_ITEM}>
+                  <Crown className="h-4 w-4 text-muted" aria-hidden="true" />
+                  Planes
                 </Link>
                 {profile?.role === 'admin' && (
                   <Link href="/app/admin" role="menuitem" className={MENU_ITEM}>

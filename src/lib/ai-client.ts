@@ -5,6 +5,8 @@ import type { TrainingIntelligenceResponse } from '@/app/api/training-intelligen
 import type { LevelAssessment, AssessmentSelfReport } from '@/types/assessment';
 import type { ChatHistoryEntry } from '@/types/chat';
 
+import { PlanRequiredError, requestPlan } from '@/lib/billing';
+
 /** Evento que abre la hoja de permiso de IA (la escucha AIConsentGate). */
 export const AI_CONSENT_EVENT = 'forgia:ai-consent-required';
 
@@ -13,14 +15,18 @@ export function requestAIConsent() {
   window.dispatchEvent(new Event(AI_CONSENT_EVENT));
 }
 
-/** Si la API rechazó por falta de permiso de IA, pide el permiso al usuario. */
+/**
+ * Si la API rechazó por falta de permiso de IA (403) o de plan (402), abre la
+ * hoja correspondiente. El llamador sigue mostrando su propio error.
+ */
 function requestConsentIfNeeded(response: Response) {
-  if (response.status !== 403) return;
+  if (response.status !== 403 && response.status !== 402) return;
   response
     .clone()
     .json()
     .then((data) => {
       if (data?.code === 'ai_consent_required') requestAIConsent();
+      if (data?.code === 'plan_required') requestPlan(data.error);
     })
     .catch(() => {});
 }
@@ -87,6 +93,8 @@ export async function generateWodStream(
   if (!response.ok || !response.body) {
     requestConsentIfNeeded(response);
     const errorData = await response.json().catch(() => ({ error: `Error del servidor (estado ${response.status})` }));
+    // La hoja de planes ya explica el límite: el llamador no repite el error
+    if (response.status === 402) throw new PlanRequiredError(errorData.error);
     if (response.status === 429) {
       throw new Error(errorData.error || 'Has alcanzado el límite diario. Intenta de nuevo mañana.');
     }
@@ -122,6 +130,7 @@ export async function generateWodStream(
 export async function fetchWeeklyAnalysis(): Promise<WeeklyAnalysisResponse> {
   const response = await fetch('/api/weekly-analysis');
   if (!response.ok) {
+    if (response.status === 402) throw new PlanRequiredError();
     if (response.status === 429) {
       throw new Error('Has alcanzado el límite diario de análisis. Intenta de nuevo mañana.');
     }

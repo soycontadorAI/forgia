@@ -37,8 +37,13 @@ Todas las rutas devuelven errores como JSON:
 ```
 
 - Nunca se exponen mensajes de error internos.
-- `400` body inválido · `401` no autenticado · `403` sin permiso de IA ·
-  `404` recurso no encontrado · `429` rate limit excedido · `500` error interno.
+- `400` body inválido · `401` no autenticado · `402` requiere plan Básico ·
+  `403` sin permiso de IA · `404` recurso no encontrado · `429` rate limit
+  excedido · `500` error interno.
+- Planes: `generate-program`, `chat` y `weekly-analysis` exigen plan de pago
+  (`has_paid_plan()`); `generate-wod` permite 2 WODs por semana (lunes a
+  domingo, hora de México) sin plan. Si no alcanza responden `402` con
+  `code: "plan_required"`, antes de contar contra el rate limit.
 - Las rutas que envían datos a Anthropic (`generate-wod`, `generate-program`,
   `chat`, `weekly-analysis`) exigen `profiles.ai_consent_at`. Sin él responden
   `403` con `code: "ai_consent_required"`, antes de contar contra el rate limit.
@@ -262,6 +267,26 @@ de `auth.users`; todas las tablas de `public` caen en cascada. Sin rate limit.
 
 **200**: `{ "deleted": true }`. Con cookie, la respuesta también limpia la
 sesión; un cliente nativo debe descartar sus tokens.
+
+### POST /api/billing/checkout
+
+Body `{ "price": "basico_mensual" | "basico_anual" | "fundador_anual" }`.
+Devuelve `{ "url" }` de Stripe Checkout. La primera suscripción trae 7 días de
+prueba. `409` si ya hay plan activo; `403` si el precio Fundador ya no aplica
+(`fundador_eligible()`: registrados antes del 22 de octubre de 2026 o dentro de
+los primeros 100 suscriptores).
+
+### POST /api/billing/portal
+
+Devuelve `{ "url" }` del portal de Stripe (cambiar entre mensual y anual,
+método de pago, facturas, cancelar al final del periodo). `404` sin suscripción.
+
+### POST /api/stripe/webhook
+
+Lo llama Stripe, firmado con `STRIPE_WEBHOOK_SECRET`. Sincroniza
+`checkout.session.completed` y `customer.subscription.*` en `subscriptions`
+(una fila por usuario; el usuario sólo puede leer la suya). Eliminar la cuenta
+cancela antes la suscripción de Stripe.
 
 ### POST /api/cron/push-reminders
 

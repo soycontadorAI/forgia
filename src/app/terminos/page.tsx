@@ -101,32 +101,49 @@ export default function TerminosPage() {
       </ul>
 
       <h2 className="text-xl md:text-2xl font-semibold mt-10 mb-4 text-neutral-900 dark:text-neutral-100">
-        8. Cancelación y eliminación de cuenta
+        8. Planes y pagos
       </h2>
       <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed mb-4">
-        Puede solicitar la cancelación de su cuenta y la eliminación de sus datos personales en cualquier momento enviando una solicitud a <strong>privacidad@forgia.fit</strong>. Para más información sobre sus derechos, consulte nuestro{' '}
+        Forgia ofrece un plan gratuito con funciones limitadas y un plan de pago (Básico) por suscripción mensual o anual. Los precios vigentes se muestran en la sección Planes de la aplicación, en pesos mexicanos y con IVA incluido.
+      </p>
+      <ul className="list-disc list-inside space-y-2 mb-4 text-neutral-700 dark:text-neutral-300">
+        <li><strong>Renovación automática:</strong> la suscripción se renueva al final de cada periodo y se cobra al método de pago registrado hasta que la cancele.</li>
+        <li><strong>Prueba gratuita:</strong> la primera suscripción incluye 7 días de prueba. Si cancela antes de que terminen, no se realiza ningún cargo.</li>
+        <li><strong>Cancelación:</strong> puede cancelar en cualquier momento desde Cuenta → Administrar suscripción. Conserva el plan hasta el final del periodo pagado y no se generan cargos posteriores.</li>
+        <li><strong>Cambios de precio:</strong> se avisarán con al menos 30 días de anticipación y aplicarán a partir de la siguiente renovación. El precio Fundador se mantiene mientras la suscripción siga activa sin interrupción.</li>
+        <li><strong>Procesamiento de pagos:</strong> los pagos los procesa Stripe. Forgia no almacena los datos completos de su tarjeta.</li>
+      </ul>
+      <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed mb-4">
+        Si contrata desde la aplicación de iOS, el cobro, la renovación y la cancelación se rigen por las condiciones de Apple y se administran desde los ajustes de su cuenta de Apple.
+      </p>
+
+      <h2 className="text-xl md:text-2xl font-semibold mt-10 mb-4 text-neutral-900 dark:text-neutral-100">
+        9. Cancelación y eliminación de cuenta
+      </h2>
+      <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed mb-4">
+        Puede eliminar su cuenta y sus datos en cualquier momento desde Cuenta → Eliminar cuenta, o solicitarlo a <strong>privacidad@forgia.fit</strong>. Eliminar la cuenta no cancela una suscripción contratada a través de Apple; esa se cancela desde los ajustes de su cuenta de Apple. Para más información sobre sus derechos, consulte nuestro{' '}
         <a href="/privacidad" className="text-red-500 hover:text-red-600 underline">Aviso de Privacidad</a>.
       </p>
 
       <h2 className="text-xl md:text-2xl font-semibold mt-10 mb-4 text-neutral-900 dark:text-neutral-100">
-        9. Modificaciones a los términos
+        10. Modificaciones a los términos
       </h2>
       <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed mb-4">
         Forgia se reserva el derecho de modificar estos Términos y Condiciones en cualquier momento. Las modificaciones entrarán en vigor desde su publicación en la plataforma. El uso continuado del servicio después de la publicación de cambios constituye la aceptación de los mismos.
       </p>
 
       <h2 className="text-xl md:text-2xl font-semibold mt-10 mb-4 text-neutral-900 dark:text-neutral-100">
-        10. Legislación aplicable
+        11. Legislación aplicable
       </h2>
       <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed mb-4">
         Estos Términos y Condiciones se rigen por las leyes aplicables de los Estados Unidos Mexicanos. Cualquier controversia derivada del uso de la plataforma se resolverá conforme a la legislación mexicana vigente.
       </p>
 
       <h2 className="text-xl md:text-2xl font-semibold mt-10 mb-4 text-neutral-900 dark:text-neutral-100">
-        11. Fecha de última actualización
+        12. Fecha de última actualización
       </h2>
       <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed mb-4">
-        Estos Términos y Condiciones fueron actualizados por última vez el 8 de febrero de 2026.
+        Estos Términos y Condiciones fueron actualizados por última vez el 21 de octubre de 2026.
       </p>
     </LegalPageLayout>
   );

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/api-auth';
 import { parseJsonBody } from '@/lib/api-validation';
+import { getStripe } from '@/lib/stripe';
 
 const deleteAccountBodySchema = z.object({
   // Confirmación explícita: evita borrar la cuenta con una petición accidental
@@ -20,6 +21,24 @@ export async function DELETE(request: NextRequest) {
 
   const parsed = await parseJsonBody(request, deleteAccountBodySchema);
   if (!parsed.ok) return parsed.response;
+
+  // Una suscripción de Stripe seguiría cobrando aunque la cuenta ya no exista
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('stripe_subscription_id, status')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (subscription?.stripe_subscription_id && ['trialing', 'active', 'past_due', 'unpaid'].includes(subscription.status)) {
+    try {
+      await getStripe().subscriptions.cancel(subscription.stripe_subscription_id);
+    } catch (error) {
+      console.error('Error al cancelar la suscripción antes de eliminar la cuenta:', user.id, error);
+      return NextResponse.json(
+        { error: 'No se pudo cancelar tu suscripción. Intenta de nuevo o escríbenos.' },
+        { status: 500 }
+      );
+    }
+  }
 
   const { error } = await supabase.rpc('delete_own_account');
   if (error) {
