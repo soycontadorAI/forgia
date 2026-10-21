@@ -2,16 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import type { MonthlyProgram, ProgramSession } from '@/types/program';
-import { getActiveProgram, getWodCountThisWeek, getCurrentWeekNumber } from '@/lib/programs';
-
-const CalendarIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-);
-
-const ArrowRightIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-);
+import { ArrowRight, CalendarDays, Flag, RotateCcw, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
+import { Card, Eyebrow } from '@/components/ui/Card';
+import { Button, ButtonLink } from '@/components/ui/Button';
+import { getActiveProgramWithProgress, resumeProgram, type ActiveProgram, type ProgramProgress, type ResumeChoice } from '@/lib/programs';
 
 const intensityColor: Record<string, string> = {
   baja: 'text-emerald-500',
@@ -20,101 +15,176 @@ const intensityColor: Record<string, string> = {
   'muy alta': 'text-red-600',
 };
 
+/** Ruta que abre la confirmación para generar un programa nuevo. */
+const NEW_PROGRAM_HREF = '/app/progreso/programa?nuevo=1';
+
 export default function ProgramBanner() {
-  const [program, setProgram] = useState<MonthlyProgram | null>(null);
-  const [currentSession, setCurrentSession] = useState<ProgramSession | null>(null);
-  const [weekNumber, setWeekNumber] = useState(1);
-  const [sessionIndex, setSessionIndex] = useState(0);
-  const [totalSessions, setTotalSessions] = useState(0);
+  const [program, setProgram] = useState<ActiveProgram | null>(null);
+  const [progress, setProgress] = useState<ProgramProgress | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<ResumeChoice | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const now = new Date();
-        const month = now.getMonth() + 1;
-        const year = now.getFullYear();
-        const prog = await getActiveProgram(month, year);
-        if (!prog) {
-          setLoading(false);
-          return;
-        }
-
-        setProgram(prog);
-        const week = getCurrentWeekNumber();
-        setWeekNumber(week);
-
-        const currentWeek = prog.weeks.find((w) => w.number === week);
-        if (!currentWeek) {
-          setLoading(false);
-          return;
-        }
-
-        setTotalSessions(currentWeek.sessions.length);
-        const wodsThisWeek = await getWodCountThisWeek();
-        const nextSessionIdx = Math.min(wodsThisWeek, currentWeek.sessions.length - 1);
-        setSessionIndex(nextSessionIdx);
-        setCurrentSession(currentWeek.sessions[nextSessionIdx]);
-      } catch {
-        // silently ignore
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
+    getActiveProgramWithProgress()
+      .then((result) => {
+        if (!result) return;
+        setProgram(result.program);
+        setProgress(result.progress);
+      })
+      .catch(() => {
+        // Sin programa visible si falla: el resto de Hoy sigue funcionando
+      })
+      .finally(() => setLoading(false));
   }, []);
+
+  const handleResume = async (choice: ResumeChoice) => {
+    if (!program || !progress) return;
+    setSaving(choice);
+    try {
+      await resumeProgram(program, progress, choice);
+      const refreshed = await getActiveProgramWithProgress();
+      if (refreshed) {
+        setProgram(refreshed.program);
+        setProgress(refreshed.progress);
+      }
+    } catch {
+      toast.error('No se pudo actualizar tu programa. Intenta de nuevo.');
+    } finally {
+      setSaving(null);
+    }
+  };
 
   if (loading) return null;
 
-  // No program — show CTA
-  if (!program) {
+  if (!program || !progress) {
     return (
       <Link
         href="/app/progreso/programa"
-        className="flex items-center justify-between gap-3 mb-6 p-4 rounded-xl border border-dashed border-neutral-300 dark:border-neutral-700 hover:border-red-500 dark:hover:border-red-500 transition-colors group"
+        className="group mb-6 flex items-center justify-between gap-3 rounded-3xl border border-dashed border-line p-4 transition-colors hover:border-accent"
       >
-        <div className="flex items-center gap-3">
-          <CalendarIcon className="h-5 w-5 text-neutral-400 dark:text-neutral-500 group-hover:text-red-500 transition-colors" />
-          <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-red-500 transition-colors">
-            Genera tu programa mensual
+        <span className="flex items-center gap-3">
+          <CalendarDays className="h-5 w-5 text-muted transition-colors group-hover:text-accent" aria-hidden="true" />
+          <span className="text-sm font-medium text-muted transition-colors group-hover:text-accent">
+            Genera tu programa de 4 semanas
           </span>
-        </div>
-        <ArrowRightIcon className="h-4 w-4 text-neutral-400 group-hover:text-red-500 transition-colors" />
+        </span>
+        <ArrowRight className="h-4 w-4 text-muted transition-colors group-hover:text-accent" aria-hidden="true" />
       </Link>
     );
   }
 
-  const currentWeek = program.weeks.find((w) => w.number === weekNumber);
+  const week = program.weeks.find((w) => w.number === progress.weekNumber);
+  const session = week?.sessions[progress.sessionIndex];
+  const percent = progress.totalSessions > 0 ? Math.round((progress.totalCompleted / progress.totalSessions) * 100) : 0;
+
+  if (progress.finished) {
+    return (
+      <Card className="mb-6">
+        <Eyebrow className="flex items-center gap-1.5">
+          <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+          Programa completo
+        </Eyebrow>
+        <p className="mt-1 font-display text-lg font-semibold text-fg">
+          Terminaste las {progress.totalSessions} sesiones.
+        </p>
+        <p className="mt-1 text-sm text-muted">
+          Genera el siguiente bloque para seguir progresando con base en lo que ya entrenaste.
+        </p>
+        <ButtonLink href={NEW_PROGRAM_HREF} size="sm" className="mt-4" icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}>
+          Generar siguiente programa
+        </ButtonLink>
+      </Card>
+    );
+  }
+
+  if (progress.needsResume) {
+    const days = progress.daysSinceLastSession;
+    return (
+      <Card className="mb-6" role="region" aria-labelledby="resume-title">
+        <Eyebrow>Semana {progress.weekNumber} · Sesión {progress.sessionIndex + 1}</Eyebrow>
+        <p id="resume-title" className="mt-1 font-display text-lg font-semibold text-fg">
+          {progress.lastSessionAt && progress.lastSessionAt > program.started_at
+            ? `Llevas ${days} días sin entrenar. ¿Cómo retomamos?`
+            : `Tu programa empezó hace ${days} días. ¿Cómo arrancamos?`}
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <Button
+            size="sm"
+            loading={saving === 'continue'}
+            disabled={saving !== null}
+            onClick={() => handleResume('continue')}
+            icon={<ArrowRight className="h-4 w-4" aria-hidden="true" />}
+          >
+            Seguir donde me quedé
+          </Button>
+          {progress.sessionIndex > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={saving === 'repeat_week'}
+              disabled={saving !== null}
+              onClick={() => handleResume('repeat_week')}
+              icon={<RotateCcw className="h-4 w-4" aria-hidden="true" />}
+            >
+              Repetir la semana
+            </Button>
+          )}
+          <ButtonLink
+            href={NEW_PROGRAM_HREF}
+            variant="secondary"
+            size="sm"
+            aria-disabled={saving !== null || undefined}
+            icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
+          >
+            Programa nuevo
+          </ButtonLink>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Link
       href="/app/progreso/programa"
-      className="block mb-6 p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-red-500/50 dark:hover:border-red-500/50 transition-colors bg-neutral-50 dark:bg-neutral-900/50"
+      className="group mb-6 block rounded-3xl bg-surface p-4 transition-colors hover:bg-raised sm:p-5"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <CalendarIcon className="h-4 w-4 text-red-500 shrink-0" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-red-500">
-              Semana {weekNumber} · {currentWeek?.focus}
-            </span>
-          </div>
-          {currentSession && (
-            <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200 truncate">
-              Sesión {sessionIndex + 1}/{totalSessions}: {currentSession.type} — {currentSession.emphasis}
+        <div className="min-w-0 flex-1">
+          <Eyebrow className="flex items-center gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Semana {progress.weekNumber}
+            {week?.focus && <> · {week.focus}</>}
+          </Eyebrow>
+          {session && (
+            <p className="mt-1 truncate text-sm font-medium text-fg">
+              Sesión {progress.sessionIndex + 1}/{week?.sessions.length}: {session.type} — {session.emphasis}
             </p>
           )}
-          {currentWeek && (
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-              Skill: {currentWeek.skillFocus}
-              {currentSession && (
-                <> · Intensidad: <span className={intensityColor[currentSession.intensity] ?? ''}>{currentSession.intensity}</span></>
+          {week && (
+            <p className="mt-0.5 text-xs text-muted">
+              Skill: {week.skillFocus}
+              {session && (
+                <> · Intensidad: <span className={intensityColor[session.intensity] ?? ''}>{session.intensity}</span></>
               )}
             </p>
           )}
         </div>
-        <ArrowRightIcon className="h-4 w-4 text-neutral-400 dark:text-neutral-500 shrink-0 mt-1" />
+        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted transition-colors group-hover:text-fg" aria-hidden="true" />
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <div
+          className="h-1.5 flex-1 overflow-hidden rounded-full bg-raised"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={progress.totalSessions}
+          aria-valuenow={progress.totalCompleted}
+          aria-label="Avance del programa"
+        >
+          <div className="h-full rounded-full bg-accent" style={{ width: `${percent}%` }} />
+        </div>
+        <span className="font-mono text-xs text-muted">
+          {progress.totalCompleted}/{progress.totalSessions}
+        </span>
       </div>
     </Link>
   );

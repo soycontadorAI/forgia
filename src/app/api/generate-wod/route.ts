@@ -17,7 +17,7 @@ import { trackUsage } from '@/lib/rate-limit';
 import type { Profile } from '@/types/profile';
 import { buildPeriodizationAnalysis, buildPeriodizationContext } from '@/lib/periodization';
 import type { WodRecord, FeedbackRecord as PeriodizationFeedbackRecord } from '@/lib/periodization';
-import type { ProgramWeek } from '@/types/program';
+import { fetchProgramWithProgress } from '@/lib/program-progress';
 
 const generateWodBodySchema = z.object({
   sessionNotes: z.string().max(1000).optional(),
@@ -64,11 +64,6 @@ export async function POST(request: NextRequest) {
   const twentyEightDaysAgo = new Date();
   twentyEightDaysAgo.setDate(twentyEightDaysAgo.getDate() - 28);
 
-  // Load program for current month
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
-
   const [feedbackResult, wodsResult, programResult, prResult] = await Promise.all([
     supabase
       .from('workout_feedback')
@@ -82,13 +77,7 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .gte('created_at', twentyEightDaysAgo.toISOString())
       .order('created_at', { ascending: false }),
-    supabase
-      .from('training_programs')
-      .select('structure')
-      .eq('user_id', user.id)
-      .eq('month', currentMonth)
-      .eq('year', currentYear)
-      .single(),
+    fetchProgramWithProgress(supabase, user.id),
     supabase
       .from('personal_records')
       .select('movement_name, record_type, value, unit')
@@ -120,29 +109,10 @@ export async function POST(request: NextRequest) {
   );
   const periodizationContext = buildPeriodizationContext(periodizationAnalysis);
 
-  // Program context (if active program exists)
-  let programContext = '';
-  if (programResult.data?.structure) {
-    const weeks = programResult.data.structure as ProgramWeek[];
-    const weekNumber = Math.min(Math.ceil(now.getDate() / 7), 4);
-
-    // Count WODs generated this week to determine current session
-    const dayOfWeek = now.getDay();
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() + mondayOffset);
-    weekStart.setHours(0, 0, 0, 0);
-
-    const wodsThisWeek = allWods.filter(
-      (w) => new Date(w.created_at) >= weekStart
-    ).length;
-
-    const currentWeek = weeks.find((w) => w.number === weekNumber);
-    if (currentWeek) {
-      const sessionIndex = Math.min(wodsThisWeek, currentWeek.sessions.length - 1);
-      programContext = buildProgramContext(weeks, weekNumber, sessionIndex);
-    }
-  }
+  // Program context: la sesión que toca según lo que ya entrenó, no el calendario
+  const programContext = programResult && !programResult.progress.finished
+    ? buildProgramContext(programResult.program.weeks, programResult.progress.weekNumber, programResult.progress.sessionIndex)
+    : '';
 
   // Build prompt
   const typedProfile = profile as Profile;

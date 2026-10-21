@@ -21,4 +21,10 @@ export interface MonthlyProgram {
   year: number;
   weeks: ProgramWeek[];
   created_at: string;
+  /** Inicio del avance: se reinicia al regenerar el programa */
+  started_at?: string;
+  /** Sesiones completadas que no cuentan (al repetir una semana) */
+  session_offset?: number;
+  /** Última respuesta a "¿cómo retomamos?" tras una pausa */
+  resume_ack_at?: string | null;
 }

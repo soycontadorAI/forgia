@@ -114,8 +114,16 @@ a `done`.
 
 ### POST /api/generate-program
 
-Genera el mesociclo de 4 semanas del mes en curso y lo persiste
-(upsert en `training_programs`). Sin body.
+Genera un mesociclo de 4 semanas y lo persiste (upsert en `training_programs`
+por usuario y mes). Sin body. Generar reinicia el avance: `started_at` = ahora,
+`session_offset` = 0, `resume_ack_at` = null.
+
+El avance no depende del calendario: la sesión que toca se calcula con los
+resultados registrados en `workout_feedback` desde `started_at`, menos
+`session_offset` (ver `src/lib/program-progress.ts`). El programa activo es el
+de `started_at` más reciente. Tras 7 días o más sin registrar resultados, la app
+pregunta cómo retomar: seguir (`resume_ack_at` = ahora), repetir la semana
+(`session_offset` += sesiones hechas en la semana) o generar uno nuevo.
 
 **200**:
 
@@ -125,8 +133,11 @@ Genera el mesociclo de 4 semanas del mes en curso y lo persiste
   "user_id": "uuid",
   "month": 6,
   "year": 2026,
-  "weeks": [ { "weekNumber": 1, "focus": "...", "intensity": "...", "...": "..." } ],
-  "created_at": "ISO 8601"
+  "weeks": [ { "number": 1, "focus": "...", "skillFocus": "...", "sessions": [ { "order": 1, "type": "...", "emphasis": "...", "intensity": "moderada" } ] } ],
+  "created_at": "ISO 8601",
+  "started_at": "ISO 8601",
+  "session_offset": 0,
+  "resume_ack_at": null
 }
 ```
 
