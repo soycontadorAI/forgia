@@ -30,7 +30,8 @@ export async function getPersonalRecords(userId: string): Promise<PersonalRecord
     .from('personal_records')
     .select('*')
     .eq('user_id', userId)
-    .order('date_achieved', { ascending: false });
+    .order('date_achieved', { ascending: false })
+    .limit(500);
 
   if (error) throw new Error(`Error al cargar records: ${error.message}`);
   return (data ?? []) as PersonalRecord[];

@@ -5,6 +5,12 @@ import readingTime from 'reading-time';
 
 const BLOG_DIR = path.join(process.cwd(), 'content', 'blog');
 
+// gray-matter convierte `date: 2026-02-26` (sin comillas) en Date; se normaliza a YYYY-MM-DD
+function normalizeDate(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return typeof value === 'string' ? value : '';
+}
+
 function isPublished(date: string): boolean {
   return new Date(date).getTime() <= Date.now();
 }
@@ -41,7 +47,7 @@ export function getAllPostsMeta(): BlogPostMeta[] {
     return {
       slug,
       title: data.title ?? '',
-      date: data.date ?? '',
+      date: normalizeDate(data.date),
       excerpt: data.excerpt ?? '',
       tags: data.tags ?? [],
       author: data.author ?? 'Israel Castro',
@@ -64,14 +70,14 @@ export function getPostBySlug(slug: string): BlogPost | null {
   const raw = fs.readFileSync(filePath, 'utf-8');
   const { data, content } = matter(raw);
 
-  if (!isPublished(data.date ?? '')) return null;
+  if (!isPublished(normalizeDate(data.date))) return null;
 
   const stats = readingTime(content);
 
   return {
     slug,
     title: data.title ?? '',
-    date: data.date ?? '',
+    date: normalizeDate(data.date),
     excerpt: data.excerpt ?? '',
     tags: data.tags ?? [],
     author: data.author ?? 'Israel Castro',
@@ -88,7 +94,7 @@ export function getAllSlugs(): string[] {
     .filter((f) => {
       const raw = fs.readFileSync(path.join(BLOG_DIR, f), 'utf-8');
       const { data } = matter(raw);
-      return isPublished(data.date ?? '');
+      return isPublished(normalizeDate(data.date));
     })
     .map(slugFromFilename);
 }

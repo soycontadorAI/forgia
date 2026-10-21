@@ -8,12 +8,19 @@ import AppFooter from '@/components/AppFooter';
 import BottomTabBar from '@/components/nav/BottomTabBar';
 import OnboardingGuard from '@/components/onboarding/OnboardingGuard';
 import OpenBanner from '@/components/open/OpenBanner';
+import type { Profile } from '@/types/profile';
 
 const ChatAssistant = dynamic(() => import('@/components/chat/ChatAssistant'), { ssr: false });
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({
+  children,
+  initialProfile,
+}: {
+  children: React.ReactNode;
+  initialProfile?: Profile | null;
+}) {
   return (
-    <AuthProvider>
+    <AuthProvider initialProfile={initialProfile}>
       <ChatProvider>
         <div className="min-h-screen flex flex-col pb-(--tabbar-h)">
           <OpenBanner />
