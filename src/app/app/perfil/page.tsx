@@ -186,7 +186,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 max-w-4xl py-8 space-y-8">
+    <div className="space-y-8">
       {/* Page header */}
       <div>
         <h1 className="text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">

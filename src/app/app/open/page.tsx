@@ -133,9 +133,9 @@ export default function OpenPage() {
 
       {/* Floating Action Bar */}
       {!showLiveMode && (
-        <div data-print-hide className="fixed bottom-0 left-0 right-0 z-40">
-          <div className="h-8 bg-linear-to-t from-white dark:from-[#0a0a0a] to-transparent" />
-          <div className="bg-white dark:bg-[#0a0a0a] border-t border-neutral-200 dark:border-neutral-800 px-[max(1rem,env(safe-area-inset-left,1rem))] pb-[env(safe-area-inset-bottom,0px)]">
+        <div data-print-hide className="fixed bottom-(--tabbar-h) left-0 right-0 z-40">
+          <div className="h-8 bg-linear-to-t from-ground to-transparent" />
+          <div className="bg-ground border-t border-line px-[max(1rem,env(safe-area-inset-left,1rem))] sm:pb-[env(safe-area-inset-bottom,0px)]">
             <div className="container mx-auto max-w-4xl flex items-center justify-between py-3">
               <div className="flex items-center gap-2">
                 <CopyWodButton wod={wod} variant="icon" />

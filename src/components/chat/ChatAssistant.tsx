@@ -168,8 +168,8 @@ export default function ChatAssistant() {
     [isStreaming, remainingMessages, messages, currentWod, currentWodId]
   );
 
-  // Determine FAB position: higher when action bar is visible (WOD exists)
-  const fabBottom = currentWod ? 'bottom-24' : 'bottom-6';
+  // Por encima de la barra inferior (móvil) y, si hay WOD, de la barra de acciones
+  const fabBottom = currentWod ? 'bottom-[calc(var(--tabbar-h)+6rem)]' : 'bottom-[calc(var(--tabbar-h)+1.5rem)]';
 
   return (
     <>

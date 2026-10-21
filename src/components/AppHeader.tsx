@@ -1,237 +1,136 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LogOut, Settings, Trophy } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import ThemeToggle from '@/components/ThemeToggle';
-import { Menu, X, LogOut } from 'lucide-react';
-import { isOpenSeasonActive } from '@/lib/open-workouts';
 import UserAvatar from '@/components/UserAvatar';
+import { NAV_ITEMS } from '@/components/nav/nav-items';
+import { isOpenSeasonActive } from '@/lib/open-workouts';
+import { cx } from '@/lib/cx';
 
+const MENU_ITEM = 'flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-fg transition-colors hover:bg-raised';
+
+/** Header de la app: marca, navegación en escritorio y menú de cuenta. */
 export default function AppHeader() {
   const { profile, signOut } = useAuth();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const desktopProfileRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
 
-  const navLinks = [
-    { href: '/app', label: 'WOD' },
-    ...(isOpenSeasonActive() ? [{ href: '/app/open', label: 'Open' }] : []),
-    { href: '/app/biblioteca', label: 'Biblioteca' },
-    { href: '/app/records', label: 'Records' },
-    { href: '/app/historia', label: 'Historia' },
-    { href: '/app/perfil', label: 'Perfil' },
-  ];
-
-  // Close menu on route change
+  // Cerrar al cambiar de ruta
   useEffect(() => {
     setMenuOpen(false);
-    setProfileMenuOpen(false);
   }, [pathname]);
 
-  // Prevent body scroll when menu is open
+  // Cerrar con Escape o clic fuera
   useEffect(() => {
-    if (menuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    const onClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onClick);
     return () => {
-      document.body.style.overflow = '';
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onClick);
     };
   }, [menuOpen]);
 
-  // Close on Escape
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setMenuOpen(false);
-        setProfileMenuOpen(false);
-      }
-    };
-    if (menuOpen || profileMenuOpen) {
-      document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
-    }
-  }, [menuOpen, profileMenuOpen]);
-
-  // Close desktop profile dropdown on click outside
-  useEffect(() => {
-    if (!profileMenuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (desktopProfileRef.current && !desktopProfileRef.current.contains(e.target as Node)) {
-        setProfileMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [profileMenuOpen]);
+  const name = profile?.display_name || 'Atleta';
 
   return (
-    <header className="py-6 border-b border-neutral-200 dark:border-neutral-800">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-6">
-            <Link href="/app" className="flex items-center gap-2 text-xl font-semibold text-red-500">
-              <Image src="/apple-touch-icon.png" alt="" width={24} height={24} className="rounded-md" />
-              Forgia
-            </Link>
-            {/* Desktop nav */}
-            <nav className="hidden sm:flex items-center gap-4">
-              {navLinks.map((link) => (
+    <header
+      data-print-hide
+      className="sticky top-0 z-30 border-b border-line bg-ground/85 pt-[env(safe-area-inset-top,0px)] backdrop-blur-lg"
+    >
+      <div className="container mx-auto flex h-16 max-w-4xl items-center justify-between gap-4 px-4">
+        <div className="flex items-center gap-8">
+          <Link href="/app" className="flex items-center gap-2 font-display text-lg font-bold tracking-tight">
+            <Image src="/apple-touch-icon.png" alt="" width={28} height={28} className="rounded-lg" />
+            Forgia
+          </Link>
+
+          <nav aria-label="Principal" className="hidden items-center gap-1 sm:flex">
+            {NAV_ITEMS.map(({ href, label, isActive }) => {
+              const active = isActive(pathname);
+              return (
                 <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`text-sm font-medium transition-colors ${
-                    pathname === link.href
-                      ? 'text-red-500'
-                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100'
-                  }`}
+                  key={href}
+                  href={href}
+                  aria-current={active ? 'page' : undefined}
+                  className={cx(
+                    'rounded-full px-3 py-2 text-sm transition-colors',
+                    active ? 'bg-surface font-semibold text-fg' : 'text-muted hover:text-fg'
+                  )}
                 >
-                  {link.label}
+                  {label}
                 </Link>
-              ))}
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Desktop: theme + profile dropdown */}
-            <span className="hidden sm:inline">
-              <ThemeToggle />
-            </span>
-            <div ref={desktopProfileRef} className="relative hidden sm:block">
-              <button
-                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                className="text-sm font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <div ref={menuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-controls={menuId}
+              aria-label={`Menú de cuenta de ${name}`}
+              className="flex h-11 items-center gap-2 rounded-full pl-1 pr-1 transition-colors hover:bg-surface sm:pr-3"
+            >
+              <UserAvatar displayName={profile?.display_name ?? null} size="size-9" />
+              <span className="hidden max-w-[10rem] truncate text-sm font-medium sm:inline">{name}</span>
+            </button>
+
+            {menuOpen && (
+              <div
+                id={menuId}
+                role="menu"
+                className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-line bg-surface shadow-xl"
               >
-                {profile?.display_name || profile?.email || 'Atleta'}
-              </button>
-              {profileMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-lg overflow-hidden z-50">
-                  <Link
-                    href="/app/cuenta"
-                    onClick={() => setProfileMenuOpen(false)}
-                    className="block px-4 py-3 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
-                  >
-                    Cuenta
-                  </Link>
-                  <button
-                    onClick={() => {
-                      setProfileMenuOpen(false);
-                      signOut();
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium text-neutral-500 dark:text-neutral-400 hover:text-red-500 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Cerrar sesión
-                  </button>
+                <div className="border-b border-line px-4 py-3">
+                  <p className="truncate text-sm font-semibold">{name}</p>
+                  {profile?.email && <p className="truncate text-xs text-muted">{profile.email}</p>}
                 </div>
-              )}
-            </div>
-            {/* Mobile: theme toggle + hamburger */}
-            <div className="flex items-center gap-1 sm:hidden">
-              <ThemeToggle />
-              <button
-                onClick={() => setMenuOpen(!menuOpen)}
-                className="p-2 rounded-lg text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
-              >
-                {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
-            </div>
+                <Link href="/app/cuenta" role="menuitem" className={MENU_ITEM}>
+                  <Settings className="h-4 w-4 text-muted" aria-hidden="true" />
+                  Cuenta
+                </Link>
+                {isOpenSeasonActive() && (
+                  <Link href="/app/open" role="menuitem" className={MENU_ITEM}>
+                    <Trophy className="h-4 w-4 text-muted" aria-hidden="true" />
+                    CrossFit Open
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    signOut();
+                  }}
+                  className={cx(MENU_ITEM, 'border-t border-line text-accent')}
+                >
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Mobile menu overlay */}
-      {menuOpen && (
-        <div className="fixed inset-0 z-50 sm:hidden">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/20 dark:bg-black/40"
-            onClick={() => setMenuOpen(false)}
-          />
-          {/* Menu panel */}
-          <div className="absolute top-0 right-0 h-full w-72 bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 shadow-xl flex flex-col">
-            {/* Menu header */}
-            <div className="flex items-center justify-between px-5 py-6 border-b border-neutral-200 dark:border-neutral-800">
-              <span className="flex items-center gap-2 text-lg font-semibold text-red-500">
-                <Image src="/apple-touch-icon.png" alt="" width={22} height={22} className="rounded-md" />
-                Forgia
-              </span>
-              <button
-                onClick={() => setMenuOpen(false)}
-                className="p-2 rounded-lg text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                aria-label="Cerrar menú"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Navigation links */}
-            <nav className="flex-1 py-3 overflow-y-auto">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMenuOpen(false)}
-                  className={`block px-5 py-3 text-base font-medium transition-colors ${
-                    pathname === link.href
-                      ? 'text-red-500 bg-red-50 dark:bg-red-500/10'
-                      : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
-
-            {/* Bottom section: profile row with popover */}
-            <div className="relative border-t border-neutral-200 dark:border-neutral-800 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom,1rem))]">
-              {/* Popover menu (expands upward) */}
-              {profileMenuOpen && (
-                <div className="absolute bottom-full left-0 right-0 mx-5 mb-2 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-lg overflow-hidden">
-                  <Link
-                    href="/app/cuenta"
-                    onClick={() => setMenuOpen(false)}
-                    className="block px-4 py-3 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
-                  >
-                    Cuenta
-                  </Link>
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      signOut();
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium text-neutral-500 dark:text-neutral-400 hover:text-red-500 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Cerrar sesión
-                  </button>
-                </div>
-              )}
-
-              {/* Profile row (tap to toggle popover) */}
-              <button
-                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                className="flex items-center gap-3 w-full text-left"
-              >
-                <UserAvatar displayName={profile?.display_name ?? null} size="size-10" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
-                    {profile?.display_name || 'Atleta'}
-                  </p>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                    {profile?.email}
-                  </p>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 }
