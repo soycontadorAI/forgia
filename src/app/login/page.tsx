@@ -56,22 +56,18 @@ export default function LoginPage() {
     const supabase = createClient();
 
     if (isSignUp) {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          // El trigger handle_new_user guarda terms_accepted_at con la hora del servidor
+          data: { terms_accepted: true },
         },
       });
       if (error) {
         setError(translateError(error.message));
       } else {
-        if (data.user) {
-          await supabase
-            .from('profiles')
-            .update({ terms_accepted_at: new Date().toISOString() })
-            .eq('id', data.user.id);
-        }
         toast.success('Revisa tu correo para confirmar tu cuenta.');
       }
     } else {
