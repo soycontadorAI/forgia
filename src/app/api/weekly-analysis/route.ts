@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Auth sin rate limit: una respuesta en caché no consume el límite diario.
-  const auth = await requireUser(request);
+  const auth = await requireUser(request, { aiConsent: true });
   if (!auth.ok) return auth.response;
   const { user, supabase } = auth;
 

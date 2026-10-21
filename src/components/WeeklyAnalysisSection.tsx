@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import type { WeeklyAnalysisData } from '@/types/weekly-analysis';
-import { fetchWeeklyAnalysis } from '@/lib/ai-client';
+import { fetchWeeklyAnalysis, requestAIConsent } from '@/lib/ai-client';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { AlertTriangle, Flame, Lightbulb, TrendingUp, Trophy, type LucideIcon } from 'lucide-react';
 import { cx } from '@/lib/cx';
@@ -48,12 +50,16 @@ function CoachHeader({ children }: { children?: React.ReactNode }) {
 }
 
 export default function WeeklyAnalysisSection() {
+  const { profile } = useAuth();
+  const hasConsent = Boolean(profile?.ai_consent_at);
   const [analysis, setAnalysis] = useState<WeeklyAnalysisData | null>(null);
   const [feedbackCount, setFeedbackCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    // Sin permiso de IA no se pide el análisis: se ofrece activarlo
+    if (!hasConsent) return;
     const load = async () => {
       try {
         const result = await fetchWeeklyAnalysis();
@@ -66,7 +72,21 @@ export default function WeeklyAnalysisSection() {
       }
     };
     load();
-  }, []);
+  }, [hasConsent]);
+
+  if (!hasConsent) {
+    return (
+      <Card className="flex flex-col gap-3">
+        <CoachHeader />
+        <p className="text-sm text-muted">
+          Tu coach analiza tu semana con IA. Para verlo, permite que tus datos de entrenamiento se envíen a Anthropic.
+        </p>
+        <Button variant="secondary" size="sm" className="self-start" onClick={requestAIConsent}>
+          Activar el coach con IA
+        </Button>
+      </Card>
+    );
+  }
 
   if (loading) {
     return (

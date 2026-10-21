@@ -2,9 +2,10 @@
 
 import { useState, useId, type FormEvent, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { AlertCircle, Calendar, Loader2, LogOut, Mail, Save, Trash2, Zap } from 'lucide-react';
+import { AlertCircle, Calendar, Loader2, LogOut, Mail, Save, Sparkles, Trash2, Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateDisplayName } from '@/lib/profiles';
+import { setAIConsent, updateDisplayName } from '@/lib/profiles';
+import { requestAIConsent } from '@/lib/ai-client';
 import { deleteAccount } from '@/lib/account';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -44,6 +45,8 @@ export default function CuentaPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const canDelete = deleteText.trim().toUpperCase() === 'ELIMINAR';
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [revoking, setRevoking] = useState(false);
 
   // Cuando llega (o se refresca) el perfil, el campo vuelve al nombre guardado
   const [syncedProfile, setSyncedProfile] = useState(profile);
@@ -79,6 +82,21 @@ export default function CuentaPage() {
     setSigningOut(true);
     // signOut redirige a la portada incluso si Supabase falla
     await signOut();
+  };
+
+  const handleRevokeConsent = async () => {
+    if (!user) return;
+    setRevoking(true);
+    try {
+      await setAIConsent(user.id, false);
+      await refreshProfile();
+      toast.success('Permiso retirado. Ya no se envían tus datos a Anthropic.');
+    } catch {
+      toast.error('No se pudo retirar el permiso. Intenta de nuevo.');
+    } finally {
+      setRevoking(false);
+      setConfirmRevoke(false);
+    }
   };
 
   const closeDelete = () => {
@@ -195,6 +213,25 @@ export default function CuentaPage() {
         </div>
       </AccountSection>
 
+      <AccountSection title="Coach con IA">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted">
+            {profile.ai_consent_at
+              ? `Permitiste enviar tus datos de entrenamiento a Anthropic (Claude) el ${formatDate(profile.ai_consent_at)}. Así se generan tus WODs, tu programa y las respuestas del Coach.`
+              : 'Sin permiso para enviar tus datos de entrenamiento a Anthropic (Claude). La generación de WODs, el programa y el Coach están desactivados.'}
+          </p>
+          {profile.ai_consent_at ? (
+            <Button variant="secondary" className="shrink-0" onClick={() => setConfirmRevoke(true)}>
+              Retirar permiso
+            </Button>
+          ) : (
+            <Button className="shrink-0" icon={<Sparkles className="h-4 w-4" aria-hidden="true" />} onClick={requestAIConsent}>
+              Activar
+            </Button>
+          )}
+        </div>
+      </AccountSection>
+
       <AccountSection title="Sesión">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted">Cierra la sesión en este dispositivo.</p>
@@ -261,6 +298,16 @@ export default function CuentaPage() {
           </div>
         </form>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmRevoke}
+        onClose={() => setConfirmRevoke(false)}
+        onConfirm={handleRevokeConsent}
+        loading={revoking}
+        title="¿Retirar el permiso de IA?"
+        description="Dejamos de enviar tus datos a Anthropic. No podrás generar WODs ni programas ni hablar con el Coach hasta que lo vuelvas a activar. Lo que ya guardaste no se borra."
+        confirmLabel="Retirar permiso"
+      />
 
       <ConfirmDialog
         open={confirmSignOut}

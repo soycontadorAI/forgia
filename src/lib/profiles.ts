@@ -52,3 +52,15 @@ export async function updateDisplayName(userId: string, displayName: string): Pr
 
   if (error) throw new Error(`Error al actualizar nombre: ${error.message}`);
 }
+
+/** Da o retira el permiso de enviar datos de entrenamiento a Anthropic (Claude). */
+export async function setAIConsent(userId: string, granted: boolean): Promise<void> {
+  const supabase = createClient();
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ ai_consent_at: granted ? now : null, updated_at: now })
+    .eq('id', userId);
+
+  if (error) throw new Error(`Error al guardar el permiso: ${error.message}`);
+}

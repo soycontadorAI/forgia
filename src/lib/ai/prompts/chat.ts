@@ -102,7 +102,6 @@ export function buildChatContext(
   feedbackSummary: string
 ): string {
   const athlete = [
-    `Nombre: ${sanitizeUserText(profile.display_name, 60) || 'Atleta'}`,
     `Edad: ${profile.age ? `${profile.age} años` : 'no especificada'}`,
     `Nivel: ${profile.experience_level || 'Intermedio'}`,
     `Equipamiento: ${profile.equipment_level || 'no especificado'}`,

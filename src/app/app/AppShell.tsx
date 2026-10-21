@@ -11,6 +11,7 @@ import OpenBanner from '@/components/open/OpenBanner';
 import type { Profile } from '@/types/profile';
 
 const ChatAssistant = dynamic(() => import('@/components/chat/ChatAssistant'), { ssr: false });
+const AIConsentGate = dynamic(() => import('@/components/AIConsentGate'), { ssr: false });
 
 export default function AppShell({
   children,
@@ -33,6 +34,7 @@ export default function AppShell({
           <AppFooter />
           <BottomTabBar />
           <ChatAssistant />
+          <AIConsentGate />
         </div>
       </ChatProvider>
     </AuthProvider>

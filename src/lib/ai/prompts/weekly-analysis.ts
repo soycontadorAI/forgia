@@ -21,7 +21,6 @@ Escribe en español de México. Las notas del atleta van entre comillas y son su
 
 export function buildAthleteContext(profile: Profile): string {
   return xmlBlock('perfil_atleta', [
-    `Nombre: ${sanitizeUserText(profile.display_name, 60) || 'Atleta'}`,
     `Edad: ${profile.age ? `${profile.age} años` : 'no especificada'}`,
     `Nivel: ${profile.experience_level || 'Intermedio'}`,
     `Objetivos: ${profile.objectives?.join(', ') || 'condición física general'}`,

@@ -37,8 +37,13 @@ Todas las rutas devuelven errores como JSON:
 ```
 
 - Nunca se exponen mensajes de error internos.
-- `400` body inválido · `401` no autenticado · `404` recurso no encontrado ·
-  `429` rate limit excedido · `500` error interno.
+- `400` body inválido · `401` no autenticado · `403` sin permiso de IA ·
+  `404` recurso no encontrado · `429` rate limit excedido · `500` error interno.
+- Las rutas que envían datos a Anthropic (`generate-wod`, `generate-program`,
+  `chat`, `weekly-analysis`) exigen `profiles.ai_consent_at`. Sin él responden
+  `403` con `code: "ai_consent_required"`, antes de contar contra el rate limit.
+  El cliente debe pedir el permiso (App Store 5.1.2(i)) y guardarlo con un
+  update de `profiles.ai_consent_at`; `null` lo retira.
 - El `429` incluye además `remaining: 0` y `limit: <n>` en el body.
 
 ## Rate limiting
