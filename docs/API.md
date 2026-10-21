@@ -263,6 +263,23 @@ de `auth.users`; todas las tablas de `public` caen en cascada. Sin rate limit.
 **200**: `{ "deleted": true }`. Con cookie, la respuesta también limpia la
 sesión; un cliente nativo debe descartar sus tokens.
 
+### POST /api/cron/push-reminders
+
+Recordatorio push "hoy no has entrenado". No lo llama el cliente: pg_cron lo
+dispara cada hora (job `push-reminders`, Vercel Hobby sólo permite un cron
+diario) con `Authorization: Bearer <CRON_SECRET>`; sin ese header → `401`.
+
+Lee `due_push_reminders()` (service role): suscripciones cuya hora local es
+`reminder_hour`, sin resultado registrado hoy en su zona, sin aviso enviado hoy
+y por debajo de su meta semanal. Envía con `web-push`, marca `last_sent_on` y
+borra las suscripciones que el servicio de push da por vencidas (404/410).
+
+**200**: `{ "due": n, "sent": n, "expired": n }`.
+
+Los clientes guardan su suscripción directo en `push_subscriptions` (RLS por
+usuario) con `endpoint`, `p256dh`, `auth`, `timezone` (IANA) y `reminder_hour`
+(0-23). `platform: "apns"` queda reservado para la app de iOS.
+
 ## Datos de sesión para HealthKit
 
 `workout_feedback` (escrito vía Supabase directo) incluye desde la Fase 2:

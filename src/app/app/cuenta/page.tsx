@@ -11,16 +11,17 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { TextField } from '@/components/ui/Field';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
+import ReminderSettings from '@/components/ReminderSettings';
 
 function formatDate(isoString: string | null): string {
   if (!isoString) return 'No disponible';
   return new Intl.DateTimeFormat('es-MX', { dateStyle: 'long' }).format(new Date(isoString));
 }
 
-function AccountSection({ title, children }: { title: string; children: ReactNode }) {
+function AccountSection({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId}>
+    <section id={id} aria-labelledby={headingId} className="scroll-mt-20">
       <Card className="flex flex-col gap-5 sm:p-6">
         <h2 id={headingId} className="font-display text-lg font-semibold tracking-tight">
           {title}
@@ -230,6 +231,10 @@ export default function CuentaPage() {
             </Button>
           )}
         </div>
+      </AccountSection>
+
+      <AccountSection title="Recordatorios" id="recordatorios">
+        <ReminderSettings />
       </AccountSection>
 
       <AccountSection title="Sesión">

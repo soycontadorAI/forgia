@@ -24,6 +24,11 @@ NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ANTHROPIC_API_KEY=...             # Server-side only
 NEXT_PUBLIC_GA_ID=...             # Optional, GA4
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=...  # Web push (recordatorios)
+VAPID_PRIVATE_KEY=...             # Server-side only
+VAPID_SUBJECT=mailto:...
+CRON_SECRET=...                   # Bearer que manda pg_cron; igual al secreto 'push_cron_secret' en Vault
+SUPABASE_SERVICE_ROLE_KEY=...     # Sólo para /api/cron/* (src/lib/supabase/admin.ts)
 ```
 
 ## Tech Stack
