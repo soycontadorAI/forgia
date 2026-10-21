@@ -2,7 +2,7 @@
 
 import { useState, useId, type FormEvent, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { AlertCircle, Calendar, Loader2, LogOut, Mail, Save, Sparkles, Trash2, Zap } from 'lucide-react';
+import { AlertCircle, Calendar, Loader2, LogOut, Mail, Save, Sparkles, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { setAIConsent, updateDisplayName } from '@/lib/profiles';
 import { requestAIConsent } from '@/lib/ai-client';
@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/Card';
 import { TextField } from '@/components/ui/Field';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import ReminderSettings from '@/components/ReminderSettings';
+import CurrentPlan from '@/components/billing/CurrentPlan';
 
 function formatDate(isoString: string | null): string {
   if (!isoString) return 'No disponible';
@@ -203,15 +204,7 @@ export default function CuentaPage() {
       </AccountSection>
 
       <AccountSection title="Plan actual">
-        <div className="flex items-center gap-3 rounded-2xl bg-ground p-4">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft">
-            <Zap className="h-5 w-5 text-accent" aria-hidden="true" />
-          </span>
-          <div className="flex flex-col">
-            <span className="font-display text-base font-semibold">Plan Gratuito</span>
-            <span className="text-sm text-muted">Funciones premium y planes de suscripción estarán disponibles próximamente.</span>
-          </div>
-        </div>
+        <CurrentPlan />
       </AccountSection>
 
       <AccountSection title="Coach con IA">

@@ -12,6 +12,7 @@ import type { Profile } from '@/types/profile';
 
 const ChatAssistant = dynamic(() => import('@/components/chat/ChatAssistant'), { ssr: false });
 const AIConsentGate = dynamic(() => import('@/components/AIConsentGate'), { ssr: false });
+const PlanGate = dynamic(() => import('@/components/billing/PlanGate'), { ssr: false });
 
 export default function AppShell({
   children,
@@ -35,6 +36,7 @@ export default function AppShell({
           <BottomTabBar />
           <ChatAssistant />
           <AIConsentGate />
+          <PlanGate />
         </div>
       </ChatProvider>
     </AuthProvider>
