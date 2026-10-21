@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useId } from 'react';
 import dynamic from 'next/dynamic';
+import { ChevronDown, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getLatestAssessment, shouldSuggestAssessment } from '@/lib/assessments';
 import { getBenchmarkForLevel } from '@/lib/assessment-benchmarks';
@@ -10,23 +11,19 @@ import type { LevelAssessment, BenchmarkWod } from '@/types/assessment';
 import { toast } from 'sonner';
 import WodDisplay from '@/components/WodDisplay';
 import type { ExperienceLevel } from '@/types/profile';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { cx } from '@/lib/cx';
 
 const AssessmentReportModal = dynamic(() => import('@/components/AssessmentReportModal'), { ssr: false });
 const LevelUpCelebration = dynamic(() => import('@/components/LevelUpCelebration'), { ssr: false });
 
-// Icons
-const ShieldIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
-);
-
-const ChevronDownIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="6 9 12 15 18 9"/></svg>
-);
+const BADGE = 'rounded-full px-2.5 py-0.5 text-[11px] font-semibold';
 
 const statusBadge: Record<string, { label: string; classes: string }> = {
-  passed: { label: 'Aprobado', classes: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
-  failed: { label: 'No superado', classes: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
-  pending: { label: 'Pendiente', classes: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+  passed: { label: 'Aprobado', classes: 'bg-cooldown/12 text-cooldown' },
+  failed: { label: 'No superado', classes: 'bg-accent-soft text-accent' },
+  pending: { label: 'Pendiente', classes: 'bg-warmup/12 text-warmup' },
 };
 
 export default function LevelAssessmentCard() {
@@ -37,8 +34,11 @@ export default function LevelAssessmentCard() {
   const [starting, setStarting] = useState(false);
   const [showWod, setShowWod] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [celebration, setCelebration] = useState<ExperienceLevel | null>(null);
-
+  // El nivel se conserva mientras el diálogo se cierra para que devuelva el foco
+  const [celebrationLevel, setCelebrationLevel] = useState<ExperienceLevel | null>(null);
+  const [celebrationOpen, setCelebrationOpen] = useState(false);
+  const headingId = useId();
+  const wodPanelId = useId();
 
   const benchmark: BenchmarkWod | null = profile?.experience_level
     ? getBenchmarkForLevel(profile.experience_level)
@@ -80,109 +80,115 @@ export default function LevelAssessmentCard() {
       setLatestAssessment(result.assessment);
       setShowReportModal(false);
       if (result.levelChanged) {
-        setCelebration(result.assessment.to_level);
+        setCelebrationLevel(result.assessment.to_level);
+        setCelebrationOpen(true);
         refreshProfile();
       }
     },
     [refreshProfile]
   );
 
+  // La celebración puede quedar abierta aunque el nivel nuevo (Avanzado) oculte la tarjeta
+  const celebration = celebrationLevel && (
+    <LevelUpCelebration
+      open={celebrationOpen}
+      newLevel={celebrationLevel}
+      onClose={() => setCelebrationOpen(false)}
+    />
+  );
+
   // Don't show if level is Avanzado (max level) or no benchmark exists
-  if (!benchmark || profile?.experience_level === 'Avanzado') return null;
+  if (!benchmark || profile?.experience_level === 'Avanzado') return celebration || null;
   if (loading) return null;
 
   const hasPendingAssessment = latestAssessment?.status === 'pending';
   const hasRecentResult = latestAssessment && latestAssessment.status !== 'pending';
+  const isSuggested = suggest && !hasPendingAssessment && !hasRecentResult;
 
   return (
     <>
-      <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden">
-        {/* Header */}
-        <div className="p-4 flex items-start gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-red-50 dark:bg-red-900/20 shrink-0">
-            <ShieldIcon className="h-5 w-5 text-red-500" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
-                Evaluación de Nivel
-              </h3>
-              {suggest && !hasPendingAssessment && !hasRecentResult && (
-                <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                  Sugerido
-                </span>
-              )}
-              {hasRecentResult && (
-                <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${statusBadge[latestAssessment.status].classes}`}>
-                  {statusBadge[latestAssessment.status].label}
-                </span>
-              )}
+      <section aria-labelledby={headingId}>
+        <Card className="flex flex-col gap-4 sm:p-6">
+          {/* Header */}
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft">
+              <ShieldCheck className="h-5 w-5 text-accent" aria-hidden="true" />
             </div>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-              {hasPendingAssessment
-                ? `${benchmark.title} — Completa el benchmark y reporta tu resultado.`
-                : hasRecentResult && latestAssessment.status === 'passed'
-                  ? `Subiste a ${latestAssessment.to_level}. Tu programa se ajustará automáticamente.`
-                  : hasRecentResult && latestAssessment.status === 'failed'
-                    ? `No alcanzaste el criterio. Sigue entrenando y vuelve a intentarlo cuando estés listo.`
-                    : `Pasa de ${benchmark.fromLevel} a ${benchmark.toLevel} completando un benchmark WOD.`
-              }
-            </p>
-          </div>
-        </div>
-
-        {/* Pending assessment: show benchmark WOD */}
-        {hasPendingAssessment && (
-          <div className="px-4 pb-4 space-y-3">
-            {/* Toggle WOD details */}
-            <button
-              onClick={() => setShowWod(!showWod)}
-              className="w-full flex items-center justify-between text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white font-medium transition-colors"
-            >
-              <span>{showWod ? 'Ocultar WOD' : 'Ver WOD de evaluación'}</span>
-              <ChevronDownIcon className={`h-4 w-4 transition-transform ${showWod ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showWod && (
-              <div className="border-t border-neutral-200 dark:border-neutral-700 pt-3">
-                <WodDisplay wod={benchmark.wod} />
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 id={headingId} className="font-display text-lg font-semibold tracking-tight">
+                  Evaluación de nivel
+                </h2>
+                {isSuggested && <span className={cx(BADGE, 'bg-warmup/12 text-warmup')}>Sugerido</span>}
+                {hasRecentResult && (
+                  <span className={cx(BADGE, statusBadge[latestAssessment.status].classes)}>
+                    {statusBadge[latestAssessment.status].label}
+                  </span>
+                )}
               </div>
-            )}
-
-            {/* Passing criteria */}
-            <div className="rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 p-3">
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                <span className="font-semibold">Criterio:</span> {benchmark.passingCriteria}
+              <p className="text-sm text-muted">
+                {hasPendingAssessment
+                  ? `${benchmark.title}: completa el benchmark y reporta tu resultado.`
+                  : hasRecentResult && latestAssessment.status === 'passed'
+                    ? `Subiste a ${latestAssessment.to_level}. Tu programa se ajustará automáticamente.`
+                    : hasRecentResult && latestAssessment.status === 'failed'
+                      ? 'No alcanzaste el criterio. Sigue entrenando y vuelve a intentarlo cuando estés listo.'
+                      : `Pasa de ${benchmark.fromLevel} a ${benchmark.toLevel} completando un benchmark WOD.`}
               </p>
             </div>
-
-            {/* Report result button */}
-            <button
-              onClick={() => setShowReportModal(true)}
-              className="w-full py-2.5 text-sm font-bold uppercase tracking-wider text-white bg-red-500 rounded-lg hover:bg-red-600 shadow-lg shadow-red-500/25 transition-all duration-200"
-            >
-              Reportar Resultado
-            </button>
           </div>
-        )}
 
-        {/* No pending assessment: CTA to start */}
-        {!hasPendingAssessment && (
-          <div className="px-4 pb-4">
-            <button
-              onClick={handleStart}
-              disabled={starting}
-              className="w-full py-2.5 text-sm font-semibold rounded-lg border-2 border-red-500 text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {starting ? 'Iniciando...' : hasRecentResult && latestAssessment.status === 'failed' ? 'Reintentar Evaluación' : 'Evalúa tu Nivel'}
-            </button>
-          </div>
-        )}
-      </div>
+          {/* Pending assessment: show benchmark WOD */}
+          {hasPendingAssessment && (
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => setShowWod(!showWod)}
+                aria-expanded={showWod}
+                aria-controls={wodPanelId}
+                className="flex min-h-11 w-full items-center justify-between rounded-2xl px-1 text-sm font-medium text-muted transition-colors hover:text-fg"
+              >
+                <span>{showWod ? 'Ocultar WOD' : 'Ver WOD de evaluación'}</span>
+                <ChevronDown
+                  className={cx('h-4 w-4 transition-transform', showWod && 'rotate-180')}
+                  aria-hidden="true"
+                />
+              </button>
 
-      {/* Report modal */}
-      {showReportModal && hasPendingAssessment && (
+              {showWod && (
+                <div id={wodPanelId} className="border-t border-line pt-3">
+                  <WodDisplay wod={benchmark.wod} />
+                </div>
+              )}
+
+              <p className="rounded-2xl bg-warmup/12 p-3 text-sm text-fg">
+                <span className="font-semibold text-warmup">Criterio:</span> {benchmark.passingCriteria}
+              </p>
+
+              <Button fullWidth onClick={() => setShowReportModal(true)}>
+                Reportar resultado
+              </Button>
+            </div>
+          )}
+
+          {/* No pending assessment: CTA to start */}
+          {!hasPendingAssessment && (
+            <Button variant={isSuggested ? 'primary' : 'secondary'} fullWidth onClick={handleStart} loading={starting}>
+              {starting
+                ? 'Iniciando…'
+                : hasRecentResult && latestAssessment.status === 'failed'
+                  ? 'Reintentar evaluación'
+                  : 'Evalúa tu nivel'}
+            </Button>
+          )}
+        </Card>
+      </section>
+
+      {/* Report modal: montado mientras hay evaluación pendiente para que el diálogo
+          pueda cerrarse (y devolver el foco) en lugar de desaparecer de golpe */}
+      {hasPendingAssessment && (
         <AssessmentReportModal
+          open={showReportModal}
           assessment={latestAssessment}
           benchmark={benchmark}
           onComplete={handleComplete}
@@ -190,13 +196,7 @@ export default function LevelAssessmentCard() {
         />
       )}
 
-      {/* Level up celebration */}
-      {celebration && (
-        <LevelUpCelebration
-          newLevel={celebration}
-          onClose={() => setCelebration(null)}
-        />
-      )}
+      {celebration}
     </>
   );
 }

@@ -1,21 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import type { AssessmentSelfReport, LevelAssessment } from '@/types/assessment';
 import type { BenchmarkWod } from '@/types/assessment';
 import { completeAssessment } from '@/lib/ai-client';
-import SegmentedButton from '@/components/ui/SegmentedButton';
-import Spinner from '@/components/Spinner';
+import { Dialog } from '@/components/ui/Dialog';
+import { Button } from '@/components/ui/Button';
+import { TextField, TextAreaField } from '@/components/ui/Field';
+import { PillRadioGroup } from '@/components/ChoiceControls';
 
 interface AssessmentReportModalProps {
+  open: boolean;
   assessment: LevelAssessment;
   benchmark: BenchmarkWod;
   onComplete: (result: { assessment: LevelAssessment; levelChanged: boolean }) => void;
   onClose: () => void;
 }
 
+const COMPLETED_OPTIONS = [
+  { value: 'si', label: 'Sí' },
+  { value: 'no', label: 'No' },
+] as const;
+
+const MODE_OPTIONS = [
+  { value: 'Rx', label: 'Rx' },
+  { value: 'Scaled', label: 'Scaled' },
+] as const;
+
 export default function AssessmentReportModal({
+  open,
   assessment,
   benchmark,
   onComplete,
@@ -27,13 +41,15 @@ export default function AssessmentReportModal({
   const [rxOrScaled, setRxOrScaled] = useState<'Rx' | 'Scaled'>('Rx');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
+  const formId = useId();
+  const submitHintId = useId();
 
   const isAmrap = benchmark.wod.metcon.type?.toLowerCase().includes('amrap');
 
   const canSubmit = completed !== null && !submitting;
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
     if (!canSubmit) return;
     setSubmitting(true);
 
@@ -55,125 +71,87 @@ export default function AssessmentReportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+    <Dialog
+      open={open}
+      onClose={() => {
+        if (!submitting) onClose();
+      }}
+      title="Reportar resultado"
+      description={benchmark.title}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            disabled={completed === null}
+            loading={submitting}
+            aria-describedby={completed === null ? submitHintId : undefined}
+          >
+            {submitting ? 'Enviando…' : 'Enviar resultado'}
+          </Button>
+        </>
+      }
+    >
+      <form id={formId} onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+        <PillRadioGroup
+          legend="¿Completaste el WOD?"
+          options={COMPLETED_OPTIONS}
+          value={completed === null ? null : completed ? 'si' : 'no'}
+          onChange={(v) => setCompleted(v === 'si')}
+        />
 
-      {/* Modal */}
-      <div className="relative bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-700 shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 space-y-5">
-        <div>
-          <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">
-            Reportar Resultado
-          </h2>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-            {benchmark.title}
-          </p>
-        </div>
-
-        {/* Completed? */}
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            ¿Completaste el WOD? <span className="text-red-500">*</span>
-          </label>
-          <SegmentedButton
-            options={['Sí', 'No']}
-            selected={completed === null ? '' : completed ? 'Sí' : 'No'}
-            onSelect={(v) => setCompleted(v === 'Sí')}
-          />
-        </div>
-
-        {/* Time */}
-        <div>
-          <label htmlFor="assessment-time" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Tiempo total (minutos)
-          </label>
-          <input
-            id="assessment-time"
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <TextField
+            label="Tiempo total (minutos)"
             type="number"
+            inputMode="decimal"
             min={0}
             max={60}
             value={totalTime}
             onChange={(e) => setTotalTime(e.target.value)}
             placeholder="Ej: 5"
-            className="w-full sm:w-32 px-3 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-red-500 focus:border-red-500 text-sm"
           />
-        </div>
-
-        {/* Rounds/Reps (for AMRAP) */}
-        {isAmrap && (
-          <div>
-            <label htmlFor="assessment-rounds" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-              Rondas + Reps
-            </label>
-            <input
-              id="assessment-rounds"
+          {isAmrap && (
+            <TextField
+              label="Rondas + reps"
               type="text"
               value={roundsOrReps}
               onChange={(e) => setRoundsOrReps(e.target.value)}
               placeholder="Ej: 14+3"
-              className="w-full sm:w-40 px-3 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-red-500 focus:border-red-500 text-sm"
             />
-          </div>
-        )}
-
-        {/* Rx / Scaled */}
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Modalidad
-          </label>
-          <SegmentedButton
-            options={['Rx', 'Scaled']}
-            selected={rxOrScaled}
-            onSelect={(v) => setRxOrScaled(v as 'Rx' | 'Scaled')}
-          />
+          )}
         </div>
 
-        {/* Notes */}
-        <div>
-          <label htmlFor="assessment-notes" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Notas (opcional)
-          </label>
-          <textarea
-            id="assessment-notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="¿Cómo te sentiste? ¿Algún detalle relevante?"
-            rows={3}
-            className="w-full px-3 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-red-500 focus:border-red-500 text-sm"
-          />
-        </div>
+        <PillRadioGroup
+          legend="Modalidad"
+          options={MODE_OPTIONS}
+          value={rxOrScaled}
+          onChange={setRxOrScaled}
+          className="sm:max-w-xs"
+        />
 
-        {/* Passing criteria reminder */}
-        <div className="rounded-lg bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 p-3">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            <span className="font-semibold">Criterio para pasar:</span> {benchmark.passingCriteria}
+        <TextAreaField
+          label="Notas"
+          hint="Opcional"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="¿Cómo te sentiste? ¿Algún detalle relevante?"
+          rows={3}
+        />
+
+        <p className="rounded-2xl bg-ground p-3 text-sm text-muted">
+          <span className="font-semibold text-fg">Criterio para pasar:</span> {benchmark.passingCriteria}
+        </p>
+
+        {completed === null && (
+          <p id={submitHintId} className="text-xs text-muted">
+            Indica si completaste el WOD para poder enviar tu resultado.
           </p>
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 text-sm font-medium text-neutral-600 dark:text-neutral-400 border border-neutral-300 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="flex-1 py-2.5 text-sm font-bold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {submitting ? (
-              <>
-                <Spinner />
-                Enviando...
-              </>
-            ) : (
-              'Enviar Resultado'
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+        )}
+      </form>
+    </Dialog>
   );
 }
