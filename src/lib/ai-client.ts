@@ -1,4 +1,4 @@
-import type { Wod, GenerateWodRequest } from '@/types/wod';
+import type { Wod, GenerateWodRequest, PartialWod } from '@/types/wod';
 import type { MonthlyProgram } from '@/types/program';
 import type { WeeklyAnalysisResponse } from '@/types/weekly-analysis';
 import type { TrainingIntelligenceResponse } from '@/app/api/training-intelligence/route';
@@ -38,6 +38,62 @@ export async function generateWod(request?: GenerateWodRequest): Promise<Wod> {
   }
 
   return response.json();
+}
+
+export type WodStreamEvent =
+  | { type: 'status'; stage: 'thinking' }
+  | { type: 'partial'; wod: PartialWod }
+  | { type: 'done'; wod: Wod }
+  | { type: 'error'; error: string };
+
+/**
+ * Genera el WOD en streaming: `onEvent` recibe el avance (estado y WOD
+ * parcial) y la promesa resuelve con el WOD final validado.
+ */
+export async function generateWodStream(
+  request: GenerateWodRequest | undefined,
+  onEvent: (event: WodStreamEvent) => void,
+  signal?: AbortSignal
+): Promise<Wod> {
+  const response = await fetch('/api/generate-wod', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+    body: JSON.stringify(request ?? {}),
+    signal,
+  });
+
+  if (!response.ok || !response.body) {
+    const errorData = await response.json().catch(() => ({ error: `Error del servidor (estado ${response.status})` }));
+    if (response.status === 429) {
+      throw new Error(errorData.error || 'Has alcanzado el límite diario. Intenta de nuevo mañana.');
+    }
+    throw new Error(errorData.error || `La solicitud falló con el estado ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let newline = buffer.indexOf('\n');
+    while (newline !== -1) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf('\n');
+      if (!line) continue;
+
+      const event = JSON.parse(line) as WodStreamEvent;
+      if (event.type === 'error') throw new Error(event.error);
+      onEvent(event);
+      if (event.type === 'done') return event.wod;
+    }
+  }
+
+  throw new Error('La generación se interrumpió. Intenta de nuevo.');
 }
 
 export async function fetchWeeklyAnalysis(): Promise<WeeklyAnalysisResponse> {

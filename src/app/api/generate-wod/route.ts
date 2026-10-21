@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { z } from 'zod';
-import { AI_MODELS, generateStructured, isAIConfigured, isTransientAIError, systemBlocks } from '@/lib/ai/claude';
+import { AI_MODELS, generateStructured, isAIConfigured, isTransientAIError, streamStructured, systemBlocks } from '@/lib/ai/claude';
 import { wodSchema } from '@/lib/ai/schemas';
 import {
   buildFeedbackContext,
@@ -150,30 +150,85 @@ export async function POST(request: NextRequest) {
   const systemInstruction = buildSystemInstruction(typedProfile, feedbackContext, periodizationContext, programContext, prContext);
   const userPrompt = buildUserPrompt(sessionNotes);
 
+  const aiRequest = {
+    route: 'generate-wod',
+    model: AI_MODELS.wod,
+    // Caché del system prompt: regenerar con una nota reutiliza el mismo prefijo
+    system: systemBlocks(systemInstruction, 'last'),
+    user: userPrompt,
+    schema: wodSchema,
+    effort: 'medium' as const,
+  };
+
+  if (wantsStream(request)) {
+    return streamWodResponse(aiRequest, () => {
+      after(() => trackUsage(supabase, user.id, 'generate_wod'));
+    }, rateLimitHeaders(auth.rateLimit));
+  }
+
   try {
-    const wodData = await generateStructured({
-      route: 'generate-wod',
-      model: AI_MODELS.wod,
-      // Caché del system prompt: regenerar con una nota reutiliza el mismo prefijo
-      system: systemBlocks(systemInstruction, 'last'),
-      user: userPrompt,
-      schema: wodSchema,
-      effort: 'medium',
-    });
+    const wodData = await generateStructured(aiRequest);
 
     after(() => trackUsage(supabase, user.id, 'generate_wod'));
     return NextResponse.json(wodData, { headers: rateLimitHeaders(auth.rateLimit) });
   } catch (error) {
     console.error('Error al generar el WOD:', error);
-    if (isTransientAIError(error)) {
-      return NextResponse.json(
-        { error: 'El servicio de IA está temporalmente ocupado. Intenta de nuevo en unos segundos.' },
-        { status: 503 }
-      );
-    }
     return NextResponse.json(
-      { error: 'No se pudo generar el WOD. Intenta de nuevo.' },
-      { status: 500 }
+      { error: aiErrorMessage(error) },
+      { status: isTransientAIError(error) ? 503 : 500 }
     );
   }
+}
+
+// --- Streaming (NDJSON) ---
+
+function wantsStream(request: NextRequest): boolean {
+  return request.headers.get('accept')?.includes('application/x-ndjson') ?? false;
+}
+
+function aiErrorMessage(error: unknown): string {
+  return isTransientAIError(error)
+    ? 'El servicio de IA está temporalmente ocupado. Intenta de nuevo en unos segundos.'
+    : 'No se pudo generar el WOD. Intenta de nuevo.';
+}
+
+/**
+ * Una línea JSON por evento:
+ * {"type":"status","stage":"thinking"} → {"type":"partial","wod":{...}}* →
+ * {"type":"done","wod":{...}} o {"type":"error","error":"..."}.
+ * El HTTP status ya salió como 200, así que los errores van como evento.
+ */
+function streamWodResponse(
+  params: Parameters<typeof generateStructured<typeof wodSchema>>[0],
+  onDone: () => void,
+  headers: Record<string, string>
+): Response {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: object) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      send({ type: 'status', stage: 'thinking' });
+      try {
+        const wod = await streamStructured({
+          ...params,
+          onPartial: (partial) => send({ type: 'partial', wod: partial }),
+        });
+        onDone();
+        send({ type: 'done', wod });
+      } catch (error) {
+        console.error('Error al generar el WOD (stream):', error);
+        send({ type: 'error', error: aiErrorMessage(error) });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(body, {
+    headers: {
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      ...headers,
+    },
+  });
 }
